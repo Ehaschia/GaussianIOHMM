@@ -140,7 +140,7 @@ class GaussianLanguageModel(BasicFramework):
         nn.init.uniform_(self.transition_mu)
         # here the init of var should be alert
         nn.init.uniform_(self.transition_cho)
-        weight = self.transition_cho.data
+        weight = self.transition_cho.data - 0.5
         # maybe here we need to add some 
         weight = torch.tril(weight)
         # weight = self.atma(weight)
@@ -170,7 +170,7 @@ class GaussianLanguageModel(BasicFramework):
         len = sentence.size()[0]
 
         # update transition cho to var cho
-        trans_var = torch.matmul(self.transition_cho.transpose(-2, -1), self.transition_cho)
+        trans_var = self.atma(self.transition_cho)
         # update cho_embedding to var_embedding
         word_mu_mat = self.emission_mu_embedding(sentence)
         word_var_embedding = self.emission_cho_embedding(sentence) ** 2
