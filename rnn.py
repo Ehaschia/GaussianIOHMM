@@ -8,11 +8,11 @@ import torch.nn as nn
 import torch.onnx
 
 # import data
-from io_module.data_loader import syntic_train_data
-from .model import RNNModel as model
+from io_module.rnn_data import *
+from model import RNNModel as model
 
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM Language Model')
-parser.add_argument('--data', type=str, default='./data/wikitext-2',
+parser.add_argument('--data', type=str, default='E:/Code/GaussianIOHMM/dataset/syntic data_yong/synth/0-1000-10-new/',
                     help='location of the data corpus')
 parser.add_argument('--model', type=str, default='LSTM',
                     help='type of recurrent net (RNN_TANH, RNN_RELU, LSTM, GRU)')
@@ -60,7 +60,7 @@ device = torch.device("cuda" if args.cuda else "cpu")
 # Load data
 ###############################################################################
 
-corpus = syntic_train_data(args.data)
+corpus = Corpus(args.data)
 
 
 # Starting from sequential data, batchify arranges the dataset into columns.

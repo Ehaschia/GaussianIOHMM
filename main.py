@@ -1,7 +1,7 @@
 # coding: utf-8
 import argparse
 
-from io_module.data_loader import syntic_data
+from io_module.data_loader import *
 from io_module.logger import get_logger
 import numpy as np
 from model.LM import GaussianLanguageModel
@@ -11,24 +11,27 @@ import random
 import datetime
 import os
 from tqdm import tqdm
+import time
 
 
-def evaluate(dataset, model, device):
+def evaluate(dataset, model, device, ntokens=10):
     model.eval()
     total_loss = 0.0
+    total_length = 0
     for j in tqdm(range(len(dataset))):
         a_sample = dataset[j]
-        a_sample = [1001] + a_sample
+        a_sample = [ntokens] + a_sample
+        total_length += len(a_sample)
         input_sample = torch.from_numpy(np.array(a_sample)).long().to(device)
         loss = model.evaluate(input_sample)
         total_loss += loss
-    return total_loss / len(dataset)
+    return total_loss / (total_length-1)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Gaussian Input Output HMM")
 
-    parser.add_argument('--data', type=str, default='E:/Code/GaussianIOHMM/dataset/',
+    parser.add_argument('--data', type=str, default='E:/Code/GaussianIOHMM/dataset/hmm_generate',
                         help='location of the data corpus')
 
     parser.add_argument('--epoch', type=int, default=10)
@@ -54,6 +57,9 @@ def main():
     momentum = args.momentum
     root = args.data
 
+    # TODO hard code
+    ntokens = 10
+
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
 
@@ -65,13 +71,13 @@ def main():
 
     # Loading data
     logger.info('Load data....')
-    train_dataset = syntic_data(root, type='train')
-    dev_dataset = syntic_data(root, type='dev')
-    test_dataset = syntic_data(root, type='test')
+    train_dataset = data_loader(root, type='train') # syntic_data(root, type='train')
+    dev_dataset = data_loader(root, type='dev') # syntic_data(root, type='dev')
+    test_dataset = data_loader(root, type='test') # syntic_data(root, type='test')
 
     # bulid model
     logger.info("Building model....")
-    model = GaussianLanguageModel(dim=10, vocb_size=1002)
+    model = GaussianLanguageModel(dim=args.dim, vocb_size=ntokens+1)
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -80,13 +86,15 @@ def main():
 
     for i in range(epoch):
         epoch_loss = 0.0
+        total_length = 0
         random.shuffle(train_dataset)
         model.train()
         for j in tqdm(range(len(train_dataset))):
             a_sample = train_dataset[j]
             length = len(a_sample)
+            total_length += length
             # padding zero:1000 and add <head>: 1001
-            a_sample = [1001] + a_sample
+            a_sample = [ntokens] + a_sample
             input_sample = torch.from_numpy(np.array(a_sample)).long().to(device)
             loss = model.forward(input_sample)
             loss.backward()
@@ -97,14 +105,18 @@ def main():
                 # print("updated")
                 optimizer.step()
                 optimizer.zero_grad()
-        epoch_loss = epoch_loss / len(train_dataset)
-        logger.info("Epoch:\t" + str(i) + "\t Training loss:\t" + str(round(epoch_loss, 4)))
+        epoch_loss = epoch_loss / (total_length-1)
+        time.sleep(0.5)
+        print('')
+        logger.info("Epoch:\t" + str(i) + "\t Training loss:\t" + str(round(epoch_loss, 4)) + "\t PPL: " + str(round(np.exp(epoch_loss), 4)))
         epoch_loss_list.append(epoch_loss)
         # evaluate
         dev_loss = evaluate(dev_dataset, model, device)
         test_loss = evaluate(test_dataset, model, device)
-        logger.info("\t\t Dev Loss: " + str(round(dev_loss, 4)))
-        logger.info("\t\t Test Loss: " + str(round(test_loss, 4)))
+        time.sleep(0.5)
+        print('')
+        logger.info("\t\t Dev Loss: " + str(round(dev_loss, 4)) + "\t PPL: " + str(round(np.exp(dev_loss), 4)))
+        logger.info("\t\t Test Loss: " + str(round(test_loss, 4)) + "\t PPL: " + str(round(np.exp(test_loss), 4)))
     # print(epoch_loss_list)
 
 
