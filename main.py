@@ -44,6 +44,7 @@ def main():
     parser.add_argument('--dim', type=int, default=10)
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=0)
+    parser.add_argument('--ntokens', type=int, default=10, help='voculary size')
 
     args = parser.parse_args()
 
@@ -58,7 +59,7 @@ def main():
     root = args.data
 
     # TODO hard code
-    ntokens = 10
+    ntokens = args.ntokens
 
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
