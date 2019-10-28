@@ -1,4 +1,4 @@
-_author__ = 'Ehaschia'
+__author__ = 'Ehaschia'
 
 import logging
 import sys

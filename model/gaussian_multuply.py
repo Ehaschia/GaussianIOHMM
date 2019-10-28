@@ -8,7 +8,7 @@ from torch.nn import Parameter
 np.random.seed(0)
 torch.manual_seed(0)
 
-
+# TODO
 class GaussianMultiply(Function):
     # def __init__(self):
     #     super(GaussianMultiply, self).__init__()
@@ -67,13 +67,12 @@ class GaussianMultiply(Function):
 
         scale = zeta0 + zeta1 - zeta_new
 
-
         return scale, mu_new, cho_new
 
     @staticmethod
     def backward(ctx, *grad_outputs):
         scale_gradient, mu_gradient, cho_gradient = grad_outputs
-        
+
 
 class GaussianMultiScore(nn.Module):
     def __init__(self, mu0, mu1, cho0, cho1, sample):

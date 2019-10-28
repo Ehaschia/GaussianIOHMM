@@ -14,6 +14,7 @@ from tqdm import tqdm
 import time
 
 
+# perplexity calculator
 def evaluate(dataset, model, device, ntokens=10):
     model.eval()
     total_loss = 0.0
@@ -25,7 +26,7 @@ def evaluate(dataset, model, device, ntokens=10):
         input_sample = torch.from_numpy(np.array(a_sample)).long().to(device)
         loss = model.evaluate(input_sample)
         total_loss += loss
-    return total_loss / (total_length-1)
+    return total_loss / (total_length - 1)
 
 
 def main():
@@ -58,7 +59,6 @@ def main():
     momentum = args.momentum
     root = args.data
 
-    # TODO hard code
     ntokens = args.ntokens
 
     if not os.path.exists(args.log_dir):
@@ -72,13 +72,13 @@ def main():
 
     # Loading data
     logger.info('Load data....')
-    train_dataset = data_loader(root, type='train') # syntic_data(root, type='train')
-    dev_dataset = data_loader(root, type='dev') # syntic_data(root, type='dev')
-    test_dataset = data_loader(root, type='test') # syntic_data(root, type='test')
+    train_dataset = hmm_generate_data_loader(root, type='train')  # syntic_data(root, type='train')
+    dev_dataset = hmm_generate_data_loader(root, type='dev')  # syntic_data(root, type='dev')
+    test_dataset = hmm_generate_data_loader(root, type='test')  # syntic_data(root, type='test')
 
-    # bulid model
+    # build model
     logger.info("Building model....")
-    model = GaussianLanguageModel(dim=args.dim, vocb_size=ntokens+1)
+    model = GaussianLanguageModel(dim=args.dim, vocb_size=ntokens + 1)
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -106,10 +106,11 @@ def main():
                 # print("updated")
                 optimizer.step()
                 optimizer.zero_grad()
-        epoch_loss = epoch_loss / (total_length-1)
+        epoch_loss = epoch_loss / (total_length - 1)
         time.sleep(0.5)
-        print('')
-        logger.info("Epoch:\t" + str(i) + "\t Training loss:\t" + str(round(epoch_loss, 4)) + "\t PPL: " + str(round(np.exp(epoch_loss), 4)))
+        print("")
+        logger.info("Epoch:\t" + str(i) + "\t Training loss:\t" + str(round(epoch_loss, 4)) + "\t PPL: " + str(
+            round(np.exp(epoch_loss), 4)))
         epoch_loss_list.append(epoch_loss)
         # evaluate
         dev_loss = evaluate(dev_dataset, model, device)
