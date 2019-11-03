@@ -196,10 +196,10 @@ class GaussianBatchLanguageModel(nn.Module):
         inside_var = torch.eye(self.dim, requires_grad=False).repeat(batch, 1, 1)
         for i in range(max_len):
             # update inside score from pred and current inside score
-            _, pred_mu, pred_var = gaussian_multi_integral(trans_mu, inside_mu, trans_var, inside_var)
-            _, inside_mu, inside_var = gaussian_multi(pred_mu, word_mu_mat[i], pred_var, word_var_mat[i])
-            holder_mu.append(pred_mu)
-            holder_var.append(pred_var)
+            _, part_mu, part_var = gaussian_multi_integral(trans_mu, inside_mu, trans_var, inside_var)
+            _, inside_mu, inside_var = gaussian_multi(part_mu, word_mu_mat[i], part_var, word_var_mat[i])
+            holder_mu.append(inside_mu)
+            holder_var.append(inside_var)
 
         # get right word, calculate
         # pred_mu shape [len, dim]
@@ -220,6 +220,10 @@ class GaussianBatchLanguageModel(nn.Module):
 
     def get_loss(self, sentences, masks):
         decoded = self.forward(sentences)
+
+        sentences = (sentences[:, 1:]).contiguous()
+        masks = (masks[:, 1:]).contiguous()
+        decoded = (decoded[:, :-1]).contiguous()
         return torch.sum(
             self.criterion(decoded.view(-1, self.ntoken), sentences.view(-1)).view(
                 sentences.size()) * masks) / torch.sum(masks)
@@ -233,7 +237,7 @@ class GaussianBatchLanguageModel(nn.Module):
 class RNNLanguageModel(nn.Module):
     def __init__(self, rnn_type, ntoken, ninp, nhid, nlayers=1, dropout=0.0, tie_weights=False):
         super(RNNLanguageModel, self).__init__()
-        self.ntoken = ntoken + 1
+        self.ntoken = ntoken + 2
         self.drop = nn.Dropout(dropout)
         self.encoder = nn.Embedding(self.ntoken, ninp)
         if rnn_type in ['LSTM', 'GRU']:
@@ -281,6 +285,10 @@ class RNNLanguageModel(nn.Module):
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor):
         decoded = self.forward(sentences, masks)
+        # rename after
+        sentences = (sentences[:, 1:]).contiguous()
+        masks = (masks[:, 1:]).contiguous()
+        decoded = (decoded[:, :-1]).contiguous()
         return torch.sum(
             self.criterion(decoded.view(-1, self.ntoken), sentences.view(-1)).view(
                 sentences.size()) * masks) / torch.sum(masks)

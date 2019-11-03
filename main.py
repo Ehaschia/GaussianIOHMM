@@ -37,8 +37,8 @@ def standardize_batch(sentence_list: List, ntokens=10) -> (torch.Tensor, torch.T
     standardized_list = []
     mask_list = []
     for sentence in sentence_list:
-        standardized_sentence = sentence + [ntokens] + [0] * (max_len - len(sentence))
-        mask = [1] * (len(sentence) + 1) + [0] * (max_len - len(sentence))
+        standardized_sentence = [ntokens] + sentence + [ntokens+1] + [0] * (max_len - len(sentence))
+        mask = [1] * (len(sentence) + 2) + [0] * (max_len - len(sentence))
         standardized_list.append(np.array(standardized_sentence))
         mask_list.append(mask)
     return torch.from_numpy(np.array(standardized_list)).long(), torch.from_numpy(np.array(mask_list)).long()
@@ -60,7 +60,6 @@ def main():
     parser.add_argument('--dim', type=int, default=10)
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=0)
-    parser.add_argument('--ntokens', type=int, default=10, help='voculary size')
 
     args = parser.parse_args()
 
@@ -74,8 +73,6 @@ def main():
     momentum = args.momentum
     root = args.data
 
-    ntokens = args.ntokens
-
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
 
@@ -87,14 +84,14 @@ def main():
 
     # Loading data
     logger.info('Load data....')
-    train_dataset = hmm_generate_data_loader(root, type='train')  # syntic_data(root, type='train')
-    dev_dataset = hmm_generate_data_loader(root, type='dev')  # syntic_data(root, type='dev')
-    test_dataset = hmm_generate_data_loader(root, type='test')  # syntic_data(root, type='test')
+    train_dataset = hmm_generate_data_loader(root, type='train')
+    dev_dataset = hmm_generate_data_loader(root, type='dev')
+    test_dataset = hmm_generate_data_loader(root, type='test')
 
     # build model
     logger.info("Building model....")
-    # model = GaussianBatchLanguageModel(dim=args.dim, vocab_size=ntokens + 1)
-    model = RNNLanguageModel("RNN_TANH", ntoken=ntokens, ninp=10, nhid=10)
+    model = GaussianBatchLanguageModel(dim=args.dim, vocab_size=12)
+    # model = RNNLanguageModel("RNN_TANH", ntoken=10, ninp=10, nhid=10)
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -107,13 +104,8 @@ def main():
         model.train()
         optimizer.zero_grad()
         for j in tqdm(range(math.ceil(len(train_dataset) / batch_size))):
-        # for j in tqdm(range(1)):
             samples = train_dataset[j * batch_size: (j + 1) * batch_size]
-            # length = len(a_sample)
-            # total_length += length
-            # # padding zero:1000 and add <head>: 1001
-            # a_sample = [ntoken] + a_sample
-            # input_sample = torch.from_numpy(np.array(a_sample)).long().to(device)
+
             input_sample, mask = standardize_batch(samples)
             batch_length = torch.sum(mask).item()
             total_length += batch_length
@@ -122,16 +114,9 @@ def main():
             optimizer.step()
             optimizer.zero_grad()
             epoch_loss += loss.item() * batch_length
-            # print("sample\t" + str(j) + "\tloss\t" + str(loss.item()))
-
-            # if ((j + 1) % batch) == 0 or (j == len(train_dataset) - 1):
-            #     # print("updated")
-            #     optimizer.step()
-            #     optimizer.zero_grad()
         epoch_loss = epoch_loss / (total_length - 1)
         time.sleep(0.5)
-        logger.info("Epoch:\t" + str(i) + "\t Training loss:\t" + str(round(epoch_loss, 4)) + "\t PPL: " + str(
-            round(np.exp(epoch_loss), 4)))
+        logger.info("Epoch:\t" + str(i) + "\t Training loss:\t" + str(round(epoch_loss, 4)) + "\t PPL: " + str(round(np.exp(epoch_loss), 4)))
         epoch_loss_list.append(epoch_loss)
         # evaluate
         dev_loss = evaluate(dev_dataset, model, device)
