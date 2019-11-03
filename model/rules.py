@@ -5,8 +5,9 @@ from torch.nn import Parameter
 
 class SingleUnitRule(nn.Module):
     def __init__(self, dim: int) -> None:
-        self.mu = Parameter(torch.tensor(dim))
-        self.cholesky = Parameter(torch.tensor(dim, dim))
+        super(SingleUnitRule, self).__init__()
+        self.mu = Parameter(torch.empty(dim), requires_grad=True)
+        self.cholesky = Parameter(torch.empty(dim, dim), requires_grad=True)
         self.reset_parameter()
         self.var = self.cholesky.t().matmul(self.cholesky)
         
@@ -18,8 +19,9 @@ class SingleUnitRule(nn.Module):
 
 class DoubleUnitRule(nn.Module):
     def __init__(self, dim: int) -> None:
-        self.mu = Parameter(torch.tensor(2 * dim))
-        self.cholesky = Parameter(torch.tensor(2 * dim, 2 * dim))
+        super(DoubleUnitRule, self).__init__()
+        self.mu = Parameter(torch.empty(2 * dim), requires_grad=True)
+        self.cholesky = Parameter(torch.empty(2 * dim, 2 * dim), requires_grad=True)
         self.reset_parameter()
         self.var = self.cholesky.t().matmul(self.cholesky)
 

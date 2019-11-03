@@ -123,7 +123,7 @@ def repackage_hidden(h):
 # to the seq_len dimension in the LSTM.
 
 def get_batch(source, i):
-    seq_len = min(args.bpttbptt, len(source) - 1 - i)
+    seq_len = min(args.bptt, len(source) - 1 - i)
     data = source[i:i + seq_len]
     target = source[i + 1:i + 1 + seq_len].view(-1)
     return data, target
