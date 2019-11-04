@@ -90,8 +90,8 @@ def main():
 
     # build model
     logger.info("Building model....")
-    model = GaussianBatchLanguageModel(dim=args.dim, vocab_size=12)
-    # model = RNNLanguageModel("RNN_TANH", ntoken=10, ninp=10, nhid=10)
+    # model = GaussianBatchLanguageModel(dim=args.dim, vocab_size=12)
+    model = RNNLanguageModel("RNN_TANH", ntoken=10, ninp=10, nhid=10)
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -124,10 +124,9 @@ def main():
         time.sleep(0.5)
         logger.info("\t\t Dev Loss: " + str(round(dev_loss, 4)) + "\t PPL: " + str(round(np.exp(dev_loss), 4)))
         logger.info("\t\t Test Loss: " + str(round(test_loss, 4)) + "\t PPL: " + str(round(np.exp(test_loss), 4)))
-    # debug inference the predict result
-    total_dev, masks = standardize_batch(dev_dataset, ntokens=10)
-    predict = model.inference(total_dev, masks)
-    print(predict.numpy())
+        total_dev, masks = standardize_batch(dev_dataset, ntokens=10)
+        predict, corr_cnt, corr_acc = model.inference(total_dev, masks)
+        logger.info("\t\t Dev Correct Number " + str(corr_cnt) + "\t Correct Acc: " + str(round(corr_acc, 4)))
 
 
 if __name__ == '__main__':

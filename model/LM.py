@@ -136,7 +136,32 @@ def reset_embedding(init_embedding, embedding_layer, embedding_dim, trainable):
     embedding_layer.weight.requires_grad = trainable
 
 
-class GaussianBatchLanguageModel(nn.Module):
+class LanguageModel(nn.Module):
+
+    def __init__(self):
+        super(LanguageModel, self).__init__()
+
+    def get_loss(self, sentences, masks):
+        decoded = self.forward(sentences, masks)
+        sentences = (sentences[:, 1:]).contiguous()
+        masks = (masks[:, 1:]).contiguous()
+        decoded = (decoded[:, :-1]).contiguous()
+        return torch.sum(
+            self.criterion(decoded.view(-1, self.ntoken), sentences.view(-1)).view(
+                sentences.size()) * masks) / torch.sum(masks)
+
+    def inference(self, sentences: torch.Tensor, masks: torch.Tensor):
+        decoded = self.forward(sentences, masks)
+        golder_sentences = (sentences[:, 1:]).numpy()
+        masks = (masks[:, 1:]).numpy()
+        decoded = (decoded[:, :-1]).contiguous()
+        predict_sentence = torch.argmax(decoded, dim=-1).numpy()
+        correct_number = np.sum(np.equal(predict_sentence, golder_sentences) * masks)
+        correct_acc = correct_number / np.sum(masks)
+        return predict_sentence * masks, correct_number, correct_acc
+
+
+class GaussianBatchLanguageModel(LanguageModel):
     def __init__(self, dim: int, vocab_size: int, mu_embedding=None, var_embedding=None, init_var_scale=1.0):
         super(GaussianBatchLanguageModel, self).__init__()
         self.dim = dim
@@ -176,7 +201,7 @@ class GaussianBatchLanguageModel(nn.Module):
         # var_weight = self.emission_var_embedding.weight.data
         # self.emission_var_embedding.weight.data = var_weight * var_weight
 
-    def forward(self, sentences):
+    def forward(self, sentences: torch.Tensor, masks: torch.Tensor):
         batch, max_len = sentences.size()
         swapped_sentences = sentences.transpose(0, 1)
         # update transition cho to variance
@@ -213,28 +238,32 @@ class GaussianBatchLanguageModel(nn.Module):
         real_score = score.squeeze()
         return real_score
 
-    def evaluate(self, sentence):
-        loss = self.forward(sentence)
-        len = sentence.size(0)
-        return loss.item() * len
+    # def evaluate(self, sentence):
+    #     loss = self.forward(sentence)
+    #     len = sentence.size(0)
+    #     return loss.item() * len
+    #
+    # def get_loss(self, sentences, masks):
+    #     decoded = self.forward(sentences)
+    #     sentences = (sentences[:, 1:]).contiguous()
+    #     masks = (masks[:, 1:]).contiguous()
+    #     decoded = (decoded[:, :-1]).contiguous()
+    #     return torch.sum(
+    #         self.criterion(decoded.view(-1, self.ntoken), sentences.view(-1)).view(
+    #             sentences.size()) * masks) / torch.sum(masks)
+    #
+    # def inference(self, sentences: torch.Tensor, masks: torch.Tensor):
+    #     decoded = self.forward(sentences)
+    #     golder_sentences = (sentences[:, 1:]).numpy()
+    #     masks = (masks[:, 1:]).numpy()
+    #     decoded = (decoded[:, :-1]).contiguous()
+    #     predict_sentence = torch.argmax(decoded, dim=-1).numpy()
+    #     correct_number = np.sum(np.equal(predict_sentence, golder_sentences) * masks)
+    #     correct_acc = correct_number / np.sum(masks)
+    #     return predict_sentence * masks, correct_number, correct_acc
 
-    def get_loss(self, sentences, masks):
-        decoded = self.forward(sentences)
 
-        sentences = (sentences[:, 1:]).contiguous()
-        masks = (masks[:, 1:]).contiguous()
-        decoded = (decoded[:, :-1]).contiguous()
-        return torch.sum(
-            self.criterion(decoded.view(-1, self.ntoken), sentences.view(-1)).view(
-                sentences.size()) * masks) / torch.sum(masks)
-
-    def inference(self, sentences: torch.Tensor, masks: torch.Tensor):
-        decode = self.forward(sentences)
-        predict_sentence = torch.argmax(decode, dim=-1)
-        return predict_sentence * masks
-
-
-class RNNLanguageModel(nn.Module):
+class RNNLanguageModel(LanguageModel):
     def __init__(self, rnn_type, ntoken, ninp, nhid, nlayers=1, dropout=0.0, tie_weights=False):
         super(RNNLanguageModel, self).__init__()
         self.ntoken = ntoken + 2
@@ -252,12 +281,6 @@ class RNNLanguageModel(nn.Module):
         self.decoder = nn.Linear(nhid, self.ntoken)
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
-        # Optionally tie weights as in:
-        # "Using the Output Embedding to Improve Language Models" (Press & Wolf 2016)
-        # https://arxiv.org/abs/1608.05859
-        # and
-        # "Tying Word Vectors and Word Classifiers: A Loss Framework for Language Modeling" (Inan et al. 2016)
-        # https://arxiv.org/abs/1611.01462
         if tie_weights:
             if nhid != ninp:
                 raise ValueError('When using the tied flag, nhid must be equal to emsize')
@@ -283,17 +306,22 @@ class RNNLanguageModel(nn.Module):
         decoded = self.decoder(self.drop(output))
         return decoded
 
-    def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor):
-        decoded = self.forward(sentences, masks)
-        # rename after
-        sentences = (sentences[:, 1:]).contiguous()
-        masks = (masks[:, 1:]).contiguous()
-        decoded = (decoded[:, :-1]).contiguous()
-        return torch.sum(
-            self.criterion(decoded.view(-1, self.ntoken), sentences.view(-1)).view(
-                sentences.size()) * masks) / torch.sum(masks)
-
-    def inference(self, sentences: torch.Tensor, masks: torch.Tensor):
-        decode = self.forward(sentences, masks)
-        predict_sentence = torch.argmax(decode, dim=-1)
-        return predict_sentence * masks
+    # def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor):
+    #     decoded = self.forward(sentences, masks)
+    #     # rename after
+    #     sentences = (sentences[:, 1:]).contiguous()
+    #     masks = (masks[:, 1:]).contiguous()
+    #     decoded = (decoded[:, :-1]).contiguous()
+    #     return torch.sum(
+    #         self.criterion(decoded.view(-1, self.ntoken), sentences.view(-1)).view(
+    #             sentences.size()) * masks) / torch.sum(masks)
+    #
+    # def inference(self, sentences: torch.Tensor, masks: torch.Tensor):
+    #     decoded = self.forward(sentences, masks)
+    #     golder_sentences = (sentences[:, 1:]).numpy()
+    #     masks = (masks[:, 1:]).numpy()
+    #     decoded = (decoded[:, :-1]).contiguous()
+    #     predict_sentence = torch.argmax(decoded, dim=-1).numpy()
+    #     correct_number = np.sum(np.equal(predict_sentence, golder_sentences) * masks)
+    #     correct_acc = correct_number / np.sum(masks)
+    #     return predict_sentence * masks, correct_number, correct_acc
