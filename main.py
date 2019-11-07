@@ -14,6 +14,7 @@ import datetime
 import os
 from tqdm import tqdm
 import time
+import global_variables
 
 
 # perplexity calculator
@@ -37,7 +38,7 @@ def standardize_batch(sentence_list: List, ntokens=10) -> (torch.Tensor, torch.T
     standardized_list = []
     mask_list = []
     for sentence in sentence_list:
-        standardized_sentence = [ntokens] + sentence + [ntokens+1] + [0] * (max_len - len(sentence))
+        standardized_sentence = [ntokens] + sentence + [ntokens + 1] + [0] * (max_len - len(sentence))
         mask = [1] * (len(sentence) + 2) + [0] * (max_len - len(sentence))
         standardized_list.append(np.array(standardized_sentence))
         mask_list.append(mask)
@@ -47,9 +48,11 @@ def standardize_batch(sentence_list: List, ntokens=10) -> (torch.Tensor, torch.T
 def main():
     parser = argparse.ArgumentParser(description="Gaussian Input Output HMM")
 
-    parser.add_argument('--data', type=str, default='E:/Code/GaussianIOHMM/dataset/hmm_generate',
-                        help='location of the data corpus')
-
+    parser.add_argument(
+        '--data',
+        type=str,
+        default='E:/Code/GaussianIOHMM/dataset/hmm_generate_25/',
+        help='location of the data corpus')
     parser.add_argument('--epoch', type=int, default=20)
     parser.add_argument('--batch', type=int, default=10)
     parser.add_argument('--lr', type=float, default=0.001)
@@ -59,13 +62,12 @@ def main():
                         default='./output/' + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + "/")
     parser.add_argument('--dim', type=int, default=10)
     parser.add_argument('--gpu', action='store_true')
-    parser.add_argument('--random_seed', type=int, default=0)
+    parser.add_argument('--random_seed', type=int, default=10)
 
     args = parser.parse_args()
-
-    np.random.seed(args.random_seed)
-    torch.manual_seed(args.random_seed)
-    random.seed(args.random_seed)
+    np.random.seed(global_variables.RANDOM_SEED)
+    torch.manual_seed(global_variables.RANDOM_SEED)
+    random.seed(global_variables.RANDOM_SEED)
 
     epoch = args.epoch
     batch_size = args.batch
@@ -75,13 +77,24 @@ def main():
 
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
-
+    # TODO ntokens generate from dataset
+    ntokens = 50
     # save parameter
-    logger = get_logger("IOHMM", args.log_dir)
+    logger = get_logger('IOHMM', global_variables.LOG_PATH)
     logger.info(args)
 
-    device = torch.device('cuda') if args.gpu else torch.device('cpu')
+    logger.info('Parameter From global_variables.py')
+    logger.info('LOG_PATH:' + global_variables.LOG_PATH)
+    logger.info('EMISSION_CHO_GRAD:' + str(global_variables.EMISSION_CHO_GRAD))
+    logger.info('TRANSITION_CHO_GRAD:' + str(global_variables.TRANSITION_CHO_GRAD))
+    logger.info('DECODE_CHO_GRAD:' + str(global_variables.DECODE_CHO_GRAD))
+    logger.info('FAR_TRANSITION_MU:' + str(global_variables.FAR_TRANSITION_MU))
+    logger.info('FAR_DECODE_MU:' + str(global_variables.FAR_DECODE_MU))
+    logger.info('FAR_EMISSION_MU:' + str(global_variables.FAR_EMISSION_MU))
+    logger.info('RANDOM_SEED:' + str(global_variables.RANDOM_SEED))
 
+    device = torch.device('cuda') if args.gpu else torch.device('cpu')
+    print(torch.cuda.is_available())
     # Loading data
     logger.info('Load data....')
     train_dataset = hmm_generate_data_loader(root, type='train')
@@ -90,8 +103,8 @@ def main():
 
     # build model
     logger.info("Building model....")
-    # model = GaussianBatchLanguageModel(dim=args.dim, vocab_size=12)
-    model = RNNLanguageModel("RNN_TANH", ntoken=10, ninp=10, nhid=10)
+    model = GaussianBatchLanguageModel(dim=args.dim, ntokens=ntokens)
+    # model = RNNLanguageModel("RNN_TANH", ntokens=ntokens, ninp=10, nhid=10)
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -116,18 +129,20 @@ def main():
             epoch_loss += loss.item() * batch_length
         epoch_loss = epoch_loss / (total_length - 1)
         time.sleep(0.5)
-        logger.info("Epoch:\t" + str(i) + "\t Training loss:\t" + str(round(epoch_loss, 4)) + "\t PPL: " + str(round(np.exp(epoch_loss), 4)))
+        logger.info("Epoch:\t" + str(i) + "\t Training loss:\t" + str(round(epoch_loss, 4)) + "\t PPL: " + str(
+            round(np.exp(epoch_loss), 4)))
         epoch_loss_list.append(epoch_loss)
         # evaluate
-        dev_loss = evaluate(dev_dataset, model, device)
-        test_loss = evaluate(test_dataset, model, device)
+        dev_loss = evaluate(dev_dataset, model, device, ntokens=ntokens)
+        test_loss = evaluate(test_dataset, model, device, ntokens=ntokens)
         time.sleep(0.5)
         logger.info("\t\t Dev Loss: " + str(round(dev_loss, 4)) + "\t PPL: " + str(round(np.exp(dev_loss), 4)))
         logger.info("\t\t Test Loss: " + str(round(test_loss, 4)) + "\t PPL: " + str(round(np.exp(test_loss), 4)))
-        total_dev, masks = standardize_batch(dev_dataset, ntokens=10)
+        total_dev, masks = standardize_batch(dev_dataset, ntokens=ntokens)
         predict, corr_cnt, corr_acc = model.inference(total_dev, masks)
         logger.info("\t\t Dev Correct Number " + str(corr_cnt) + "\t Correct Acc: " + str(round(corr_acc, 4)))
 
 
 if __name__ == '__main__':
     main()
+    exit(1)

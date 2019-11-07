@@ -1,9 +1,11 @@
-from typing import Dict, List, Tuple, Union
+from typing import Tuple
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 from torch.nn import Parameter
+# in order to use the global variable
+import global_variables
 
 
 def atma(cholesky: torch.Tensor) -> torch.Tensor:
@@ -61,7 +63,7 @@ def gaussian_multi(mu0: torch.Tensor, mu1: torch.Tensor,
     lambda_new = lambda0 + lambda1
     eta_new = eta0 + eta1
     sigma_new = torch.inverse(lambda_new)
-    mu_new = torch.matmul(sigma_new, eta_new.unsqueeze(-1)).squeeze()
+    mu_new = torch.matmul(sigma_new, eta_new.unsqueeze(-1)).squeeze(-1)
     zeta0 = calculate_zeta(eta0, lambda0, mu=mu0)
     zeta1 = calculate_zeta(eta1, lambda1, mu=mu1)
     zeta_new = calculate_zeta(eta_new, lambda_new, mu=mu_new)
@@ -124,12 +126,15 @@ def gaussian_multi_integral(mu0: torch.Tensor, mu1: torch.Tensor,
     return scale, res_mu, res_sigma
 
 
-def reset_embedding(init_embedding, embedding_layer, embedding_dim, trainable):
+def reset_embedding(init_embedding, embedding_layer, embedding_dim, trainable, far_init):
     if init_embedding is None:
         # here random init the mu can be seen as the normal embedding
         # but for the variance, maybe we should use other method to init it.
         # Currently, the init only works for mu.
-        scale = np.sqrt(3.0 / embedding_dim)
+        if far_init:
+            scale = 0.5
+        else:
+            scale = np.sqrt(3.0 / embedding_dim)
         embedding_layer.weight.data.uniform_(-scale, scale)
     else:
         embedding_layer.load_state_dict({'weight': init_embedding})
@@ -147,7 +152,7 @@ class LanguageModel(nn.Module):
         masks = (masks[:, 1:]).contiguous()
         decoded = (decoded[:, :-1]).contiguous()
         return torch.sum(
-            self.criterion(decoded.view(-1, self.ntoken), sentences.view(-1)).view(
+            self.criterion(decoded.view(-1, self.ntokens), sentences.view(-1)).view(
                 sentences.size()) * masks) / torch.sum(masks)
 
     def inference(self, sentences: torch.Tensor, masks: torch.Tensor):
@@ -162,28 +167,34 @@ class LanguageModel(nn.Module):
 
 
 class GaussianBatchLanguageModel(LanguageModel):
-    def __init__(self, dim: int, vocab_size: int, mu_embedding=None, var_embedding=None, init_var_scale=1.0):
+    def __init__(self, dim: int, ntokens: int, mu_embedding=None, var_embedding=None, init_var_scale=1.0):
         super(GaussianBatchLanguageModel, self).__init__()
         self.dim = dim
-        self.ntoken = vocab_size
-        self.emission_mu_embedding = nn.Embedding(vocab_size, self.dim)
-        self.emission_cho_embedding = nn.Embedding(vocab_size, self.dim)
+        self.ntokens = ntokens + 2
+        self.emission_mu_embedding = nn.Embedding(self.ntokens, self.dim)
+        self.emission_cho_embedding = nn.Embedding(self.ntokens, self.dim)
 
         self.transition_mu = Parameter(torch.empty(2 * self.dim), requires_grad=True)
-        self.transition_cho = Parameter(torch.empty(2 * self.dim, 2 * self.dim), requires_grad=True)
+        self.transition_cho = Parameter(
+            torch.empty(2 * self.dim, 2 * self.dim), requires_grad=global_variables.TRANSITION_CHO_GRAD)
 
-        self.decoder_mu = Parameter(torch.empty(vocab_size, self.dim), requires_grad=True)
-        self.decoder_cho = Parameter(torch.empty(vocab_size, self.dim), requires_grad=True)
+        self.decoder_mu = Parameter(torch.empty(self.ntokens, self.dim), requires_grad=True)
+        self.decoder_cho = Parameter(
+            torch.empty(self.ntokens, self.dim), requires_grad=global_variables.DECODE_CHO_GRAD)
 
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
-        reset_embedding(mu_embedding, self.emission_mu_embedding, self.dim, True)
-        reset_embedding(var_embedding, self.emission_cho_embedding, self.dim, True)
-
+        reset_embedding(mu_embedding, self.emission_mu_embedding, self.dim, True, far_init=global_variables.FAR_EMISSION_MU)
+        reset_embedding(var_embedding, self.emission_cho_embedding, self.dim, global_variables.EMISSION_CHO_GRAD, far_init=False)
         self.reset_parameter(init_var_scale)
 
     def reset_parameter(self, init_var_scale):
-        nn.init.uniform_(self.transition_mu)
+        if global_variables.FAR_TRANSITION_MU:
+            nn.init.uniform_(self.transition_mu)
+        else:
+            to_init_transition_mu = self.transition_mu.unsqueeze(0)
+            nn.init.xavier_normal_(to_init_transition_mu)
+            self.transition_mu.data = to_init_transition_mu.squeeze(0)
         # here the init of var should be alert
         nn.init.uniform_(self.transition_cho)
         weight = self.transition_cho.data - 0.5
@@ -191,9 +202,11 @@ class GaussianBatchLanguageModel(LanguageModel):
         weight = torch.tril(weight)
         # weight = self.atma(weight)
         self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
-
-        nn.init.xavier_normal_(self.decoder_mu)
-        nn.init.xavier_normal_(self.decoder_cho)
+        if global_variables.FAR_DECODE_MU:
+            nn.init.uniform_(self.decoder_mu)
+        else:
+            nn.init.xavier_normal_(self.decoder_mu)
+        nn.init.uniform_(self.decoder_cho)
 
         # var_weight = self.decoder_var.data
         # var_weight = var_weight * var_weight
@@ -238,37 +251,13 @@ class GaussianBatchLanguageModel(LanguageModel):
         real_score = score.squeeze()
         return real_score
 
-    # def evaluate(self, sentence):
-    #     loss = self.forward(sentence)
-    #     len = sentence.size(0)
-    #     return loss.item() * len
-    #
-    # def get_loss(self, sentences, masks):
-    #     decoded = self.forward(sentences)
-    #     sentences = (sentences[:, 1:]).contiguous()
-    #     masks = (masks[:, 1:]).contiguous()
-    #     decoded = (decoded[:, :-1]).contiguous()
-    #     return torch.sum(
-    #         self.criterion(decoded.view(-1, self.ntoken), sentences.view(-1)).view(
-    #             sentences.size()) * masks) / torch.sum(masks)
-    #
-    # def inference(self, sentences: torch.Tensor, masks: torch.Tensor):
-    #     decoded = self.forward(sentences)
-    #     golder_sentences = (sentences[:, 1:]).numpy()
-    #     masks = (masks[:, 1:]).numpy()
-    #     decoded = (decoded[:, :-1]).contiguous()
-    #     predict_sentence = torch.argmax(decoded, dim=-1).numpy()
-    #     correct_number = np.sum(np.equal(predict_sentence, golder_sentences) * masks)
-    #     correct_acc = correct_number / np.sum(masks)
-    #     return predict_sentence * masks, correct_number, correct_acc
-
 
 class RNNLanguageModel(LanguageModel):
-    def __init__(self, rnn_type, ntoken, ninp, nhid, nlayers=1, dropout=0.0, tie_weights=False):
+    def __init__(self, rnn_type, ntokens, ninp, nhid, nlayers=1, dropout=0.0, tie_weights=False):
         super(RNNLanguageModel, self).__init__()
-        self.ntoken = ntoken + 2
+        self.ntokens = ntokens + 2
         self.drop = nn.Dropout(dropout)
-        self.encoder = nn.Embedding(self.ntoken, ninp)
+        self.encoder = nn.Embedding(self.ntokens, ninp)
         if rnn_type in ['LSTM', 'GRU']:
             self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout, batch_first=True)
         else:
@@ -278,7 +267,7 @@ class RNNLanguageModel(LanguageModel):
                 raise ValueError("""An invalid option for `--model` was supplied,
                                  options are ['LSTM', 'GRU', 'RNN_TANH' or 'RNN_RELU']""")
             self.rnn = nn.RNN(ninp, nhid, nlayers, nonlinearity=nonlinearity, dropout=dropout, batch_first=True)
-        self.decoder = nn.Linear(nhid, self.ntoken)
+        self.decoder = nn.Linear(nhid, self.ntokens)
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
         if tie_weights:
@@ -305,23 +294,3 @@ class RNNLanguageModel(LanguageModel):
         output, _ = nn.utils.rnn.pad_packed_sequence(packed_output, batch_first=True)
         decoded = self.decoder(self.drop(output))
         return decoded
-
-    # def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor):
-    #     decoded = self.forward(sentences, masks)
-    #     # rename after
-    #     sentences = (sentences[:, 1:]).contiguous()
-    #     masks = (masks[:, 1:]).contiguous()
-    #     decoded = (decoded[:, :-1]).contiguous()
-    #     return torch.sum(
-    #         self.criterion(decoded.view(-1, self.ntoken), sentences.view(-1)).view(
-    #             sentences.size()) * masks) / torch.sum(masks)
-    #
-    # def inference(self, sentences: torch.Tensor, masks: torch.Tensor):
-    #     decoded = self.forward(sentences, masks)
-    #     golder_sentences = (sentences[:, 1:]).numpy()
-    #     masks = (masks[:, 1:]).numpy()
-    #     decoded = (decoded[:, :-1]).contiguous()
-    #     predict_sentence = torch.argmax(decoded, dim=-1).numpy()
-    #     correct_number = np.sum(np.equal(predict_sentence, golder_sentences) * masks)
-    #     correct_acc = correct_number / np.sum(masks)
-    #     return predict_sentence * masks, correct_number, correct_acc
