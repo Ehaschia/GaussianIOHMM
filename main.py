@@ -53,7 +53,7 @@ def main():
         type=str,
         default='E:/Code/GaussianIOHMM/dataset/hmm_generate_25/',
         help='location of the data corpus')
-    parser.add_argument('--epoch', type=int, default=20)
+    parser.add_argument('--epoch', type=int, default=2)
     parser.add_argument('--batch', type=int, default=10)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--momentum', type=float, default=0.9)
@@ -108,8 +108,11 @@ def main():
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    epoch_loss_list = []
-
+    train_ppl_list = []
+    dev_ppl_list = []
+    test_ppl_list = []
+    # depend on dev ppl
+    best_epoch = 0
     for i in range(epoch):
         epoch_loss = 0.0
         total_length = 0
@@ -131,18 +134,51 @@ def main():
         time.sleep(0.5)
         logger.info("Epoch:\t" + str(i) + "\t Training loss:\t" + str(round(epoch_loss, 4)) + "\t PPL: " + str(
             round(np.exp(epoch_loss), 4)))
-        epoch_loss_list.append(epoch_loss)
         # evaluate
         dev_loss = evaluate(dev_dataset, model, device, ntokens=ntokens)
         test_loss = evaluate(test_dataset, model, device, ntokens=ntokens)
         time.sleep(0.5)
         logger.info("\t\t Dev Loss: " + str(round(dev_loss, 4)) + "\t PPL: " + str(round(np.exp(dev_loss), 4)))
         logger.info("\t\t Test Loss: " + str(round(test_loss, 4)) + "\t PPL: " + str(round(np.exp(test_loss), 4)))
+
+        train_ppl_list.append(np.exp(epoch_loss))
+        dev_ppl_list.append(np.exp(dev_loss))
+        test_ppl_list.append(np.exp(test_loss))
+        if dev_loss < dev_ppl_list[best_epoch]:
+            best_epoch = i
+
         total_dev, masks = standardize_batch(dev_dataset, ntokens=ntokens)
         predict, corr_cnt, corr_acc = model.inference(total_dev, masks)
         logger.info("\t\t Dev Correct Number " + str(corr_cnt) + "\t Correct Acc: " + str(round(corr_acc, 4)))
+    logger.info('='*10 + ' best result ' + '='*10)
+    logger.info(
+        'Epoch: ' +
+        str(best_epoch) +
+        '\tTrain PPL: ' +
+        str(round(train_ppl_list[best_epoch], 4)) +
+        '\tDev PPL: ' +
+        str(round(dev_ppl_list[best_epoch], 4)) +
+        '\tTest PPL: ' +
+        str(round(test_ppl_list[best_epoch], 4)))
+
+# TODO it is ugly. Maybe DFS is a good method
+def grid_search():
+    for emission_cho_grad in (False, True):
+        global_variables.EMISSION_CHO_GRAD = emission_cho_grad
+        for transition_cho_grad in (False, True):
+            global_variables.TRANSITION_CHO_GRAD = transition_cho_grad
+            for decode_cho_grad in (False, True):
+                global_variables.DECODE_CHO_GRAD = decode_cho_grad
+                for far_emission_mu in (False, True):
+                    global_variables.FAR_DECODE_MU = far_emission_mu
+                    for far_transition_mu in (False, True):
+                        global_variables.FAR_TRANSITION_MU = far_transition_mu
+                        for far_decode_mu in (False, True):
+                            global_variables.FAR_DECODE_MU = far_decode_mu
+                            for random_seed in range(1, 3):
+                                global_variables.RANDOM_SEED = random_seed
+                                main()
 
 
 if __name__ == '__main__':
-    main()
-    exit(1)
+    grid_search()

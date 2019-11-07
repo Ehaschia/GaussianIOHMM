@@ -132,7 +132,7 @@ def reset_embedding(init_embedding, embedding_layer, embedding_dim, trainable, f
         # but for the variance, maybe we should use other method to init it.
         # Currently, the init only works for mu.
         if far_init:
-            scale = 0.5
+            scale = 1.0
         else:
             scale = np.sqrt(3.0 / embedding_dim)
         embedding_layer.weight.data.uniform_(-scale, scale)
@@ -190,7 +190,7 @@ class GaussianBatchLanguageModel(LanguageModel):
 
     def reset_parameter(self, init_var_scale):
         if global_variables.FAR_TRANSITION_MU:
-            nn.init.uniform_(self.transition_mu)
+            nn.init.uniform_(self.transition_mu, a=-1.0, b=1.0)
         else:
             to_init_transition_mu = self.transition_mu.unsqueeze(0)
             nn.init.xavier_normal_(to_init_transition_mu)
@@ -203,7 +203,7 @@ class GaussianBatchLanguageModel(LanguageModel):
         # weight = self.atma(weight)
         self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
         if global_variables.FAR_DECODE_MU:
-            nn.init.uniform_(self.decoder_mu)
+            nn.init.uniform_(self.decoder_mu, a=-1.0, b=1.0)
         else:
             nn.init.xavier_normal_(self.decoder_mu)
         nn.init.uniform_(self.decoder_cho)
