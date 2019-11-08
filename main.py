@@ -180,7 +180,7 @@ def grid_search():
             for decode_cho_grad in (False, True):
                 global_variables.DECODE_CHO_GRAD = decode_cho_grad
                 for far_emission_mu in (False, True):
-                    global_variables.FAR_DECODE_MU = far_emission_mu
+                    global_variables.FAR_EMISSION_MU = far_emission_mu
                     for far_transition_mu in (False, True):
                         global_variables.FAR_TRANSITION_MU = far_transition_mu
                         for far_decode_mu in (False, True):
