@@ -152,7 +152,7 @@ def main():
         train_ppl_list.append(np.exp(epoch_loss))
         dev_ppl_list.append(np.exp(dev_loss))
         test_ppl_list.append(np.exp(test_loss))
-        if dev_loss < dev_ppl_list[best_epoch]:
+        if np.exp(dev_loss) < dev_ppl_list[best_epoch]:
             best_epoch = i
 
         total_dev, masks = standardize_batch(dev_dataset, ntokens=ntokens)
