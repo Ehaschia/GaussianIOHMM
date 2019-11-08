@@ -53,7 +53,7 @@ def main():
     parser.add_argument(
         '--data',
         type=str,
-        default='E:/Code/GaussianIOHMM/dataset/hmm_generate_25/',
+        default='./dataset/hmm_generate_25/',
         help='location of the data corpus')
     parser.add_argument('--epoch', type=int, default=50)
     parser.add_argument('--batch', type=int, default=10)
@@ -84,7 +84,7 @@ def main():
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
     # TODO ntokens generate from dataset
-    ntokens = 50
+    ntokens = 25
     # save parameter
     # logger = get_logger('IOHMM', global_variables.LOG_PATH)
     logger = LOGGER
@@ -98,7 +98,8 @@ def main():
     logger.info('FAR_TRANSITION_MU:' + str(global_variables.FAR_TRANSITION_MU))
     logger.info('FAR_DECODE_MU:' + str(global_variables.FAR_DECODE_MU))
     logger.info('FAR_EMISSION_MU:' + str(global_variables.FAR_EMISSION_MU))
-    logger.info('RANDOM_SEED:' + str(global_variables.RANDOM_SEED))
+    # TODO temp
+    logger.info('RANDOM_SEED:' + str(args.random_seed))
 
     device = torch.device('cuda') if args.gpu else torch.device('cpu')
     print(torch.cuda.is_available())
@@ -168,6 +169,7 @@ def main():
         '\tTest PPL: ' +
         str(round(test_ppl_list[best_epoch], 4)))
 
+
 # TODO it is ugly. Maybe DFS is a good method
 def grid_search():
     global LOGGER
@@ -183,13 +185,17 @@ def grid_search():
                         global_variables.FAR_TRANSITION_MU = far_transition_mu
                         for far_decode_mu in (False, True):
                             global_variables.FAR_DECODE_MU = far_decode_mu
-                            global_variables.LOG_PATH = './output/' + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + "/"
+                            global_variables.LOG_PATH = './output/' + datetime.datetime.now().strftime(
+                                "%Y-%m-%d_%H%M%S") + "/"
                             if not os.path.exists(global_variables.LOG_PATH):
                                 os.makedirs(global_variables.LOG_PATH)
                             if LOGGER is None:
                                 LOGGER = get_logger('IOHMM')
                             change_handler(LOGGER, global_variables.LOG_PATH)
-                            main()
+                            try:
+                                main()
+                            except:
+                                LOGGER.warning("Error in this setting!")
 
 
 if __name__ == '__main__':
