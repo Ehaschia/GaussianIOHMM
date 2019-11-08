@@ -4,7 +4,7 @@ import math
 from typing import List
 
 from io_module.data_loader import *
-from io_module.logger import get_logger
+from io_module.logger import get_logger, change_handler
 import numpy as np
 from model.LM import GaussianBatchLanguageModel, RNNLanguageModel
 import torch
@@ -15,6 +15,8 @@ import os
 from tqdm import tqdm
 import time
 import global_variables
+
+LOGGER = None
 
 
 # perplexity calculator
@@ -53,7 +55,7 @@ def main():
         type=str,
         default='E:/Code/GaussianIOHMM/dataset/hmm_generate_25/',
         help='location of the data corpus')
-    parser.add_argument('--epoch', type=int, default=2)
+    parser.add_argument('--epoch', type=int, default=50)
     parser.add_argument('--batch', type=int, default=10)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--momentum', type=float, default=0.9)
@@ -65,9 +67,13 @@ def main():
     parser.add_argument('--random_seed', type=int, default=10)
 
     args = parser.parse_args()
-    np.random.seed(global_variables.RANDOM_SEED)
-    torch.manual_seed(global_variables.RANDOM_SEED)
-    random.seed(global_variables.RANDOM_SEED)
+    # np.random.seed(global_variables.RANDOM_SEED)
+    # torch.manual_seed(global_variables.RANDOM_SEED)
+    # random.seed(global_variables.RANDOM_SEED)
+
+    np.random.seed(args.random_seed)
+    torch.manual_seed(args.random_seed)
+    random.seed(args.random_seed)
 
     epoch = args.epoch
     batch_size = args.batch
@@ -80,7 +86,8 @@ def main():
     # TODO ntokens generate from dataset
     ntokens = 50
     # save parameter
-    logger = get_logger('IOHMM', global_variables.LOG_PATH)
+    # logger = get_logger('IOHMM', global_variables.LOG_PATH)
+    logger = LOGGER
     logger.info(args)
 
     logger.info('Parameter From global_variables.py')
@@ -150,7 +157,7 @@ def main():
         total_dev, masks = standardize_batch(dev_dataset, ntokens=ntokens)
         predict, corr_cnt, corr_acc = model.inference(total_dev, masks)
         logger.info("\t\t Dev Correct Number " + str(corr_cnt) + "\t Correct Acc: " + str(round(corr_acc, 4)))
-    logger.info('='*10 + ' best result ' + '='*10)
+    logger.info('=' * 10 + ' best result ' + '=' * 10)
     logger.info(
         'Epoch: ' +
         str(best_epoch) +
@@ -163,6 +170,7 @@ def main():
 
 # TODO it is ugly. Maybe DFS is a good method
 def grid_search():
+    global LOGGER
     for emission_cho_grad in (False, True):
         global_variables.EMISSION_CHO_GRAD = emission_cho_grad
         for transition_cho_grad in (False, True):
@@ -175,9 +183,13 @@ def grid_search():
                         global_variables.FAR_TRANSITION_MU = far_transition_mu
                         for far_decode_mu in (False, True):
                             global_variables.FAR_DECODE_MU = far_decode_mu
-                            for random_seed in range(1, 3):
-                                global_variables.RANDOM_SEED = random_seed
-                                main()
+                            global_variables.LOG_PATH = './output/' + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + "/"
+                            if not os.path.exists(global_variables.LOG_PATH):
+                                os.makedirs(global_variables.LOG_PATH)
+                            if LOGGER is None:
+                                LOGGER = get_logger('IOHMM')
+                            change_handler(LOGGER, global_variables.LOG_PATH)
+                            main()
 
 
 if __name__ == '__main__':
