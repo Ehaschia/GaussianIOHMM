@@ -86,8 +86,8 @@ def main():
     # TODO ntokens generate from dataset
     ntokens = 25
     # save parameter
-    # logger = get_logger('IOHMM', global_variables.LOG_PATH)
-    logger = LOGGER
+    logger = get_logger('IOHMM')
+    # logger = LOGGER
     logger.info(args)
 
     logger.info('Parameter From global_variables.py')
@@ -102,7 +102,7 @@ def main():
     logger.info('RANDOM_SEED:' + str(args.random_seed))
 
     device = torch.device('cuda') if args.gpu else torch.device('cpu')
-    print(torch.cuda.is_available())
+
     # Loading data
     logger.info('Load data....')
     train_dataset = hmm_generate_data_loader(root, type='train')
@@ -111,8 +111,8 @@ def main():
 
     # build model
     logger.info("Building model....")
-    model = GaussianBatchLanguageModel(dim=args.dim, ntokens=ntokens)
-    # model = RNNLanguageModel("RNN_TANH", ntokens=ntokens, ninp=10, nhid=10)
+    # model = GaussianBatchLanguageModel(dim=args.dim, ntokens=ntokens)
+    model = RNNLanguageModel("LSTM", ntokens=ntokens, ninp=10, nhid=10)
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -199,4 +199,4 @@ def grid_search():
 
 
 if __name__ == '__main__':
-    grid_search()
+    main()
