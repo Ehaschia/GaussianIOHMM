@@ -126,6 +126,7 @@ class GaussianBatchLanguageModel(LanguageModel):
         # pred_var shape [batch, len, dim, dim]
         pred_mus = torch.stack(holder_mu, dim=1)
         pred_vars = torch.stack(holder_var, dim=1)
+        # result should be [batch_size, length, s]
         score, _, _ = gaussian_multi(pred_mus.unsqueeze(2),
                                      self.decoder_mu.view((1, 1) + self.decoder_mu.size()),
                                      pred_vars.unsqueeze(2),

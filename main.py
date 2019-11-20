@@ -53,7 +53,7 @@ def main():
     parser.add_argument(
         '--data',
         type=str,
-        default='./dataset/hmm_generate_25/',
+        default='./dataset/syntic_data_yong/0-1000-10-new/',
         help='location of the data corpus')
     parser.add_argument('--epoch', type=int, default=50)
     parser.add_argument('--batch', type=int, default=10)
@@ -62,7 +62,7 @@ def main():
     parser.add_argument('--var_scale', type=float, default=1.0)
     parser.add_argument('--log_dir', type=str,
                         default='./output/' + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + "/")
-    parser.add_argument('--dim', type=int, default=10)
+    parser.add_argument('--dim', type=int, default=25)
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
 
@@ -81,12 +81,10 @@ def main():
     momentum = args.momentum
     root = args.data
 
-    if not os.path.exists(args.log_dir):
-        os.makedirs(args.log_dir)
     # TODO ntokens generate from dataset
-    ntokens = 25
+    ntokens = 1000
     # save parameter
-    logger = get_logger('IOHMM')
+    logger = get_logger('IOHMM', log_dir=args.log_dir)
     # logger = LOGGER
     logger.info(args)
 
@@ -111,8 +109,8 @@ def main():
 
     # build model
     logger.info("Building model....")
-    # model = GaussianBatchLanguageModel(dim=args.dim, ntokens=ntokens)
-    model = RNNLanguageModel("LSTM", ntokens=ntokens, ninp=10, nhid=10)
+    model = GaussianBatchLanguageModel(dim=args.dim, ntokens=ntokens)
+    # model = RNNLanguageModel("LSTM", ntokens=ntokens, ninp=10, nhid=10)
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=lr)

@@ -16,23 +16,13 @@ def calculate_zeta(eta: torch.Tensor, lam: torch.Tensor,
     # zeta = - 0.5 * (dim * log 2pi  + log|sigma| + eta^T * sigma * eta)
     # TODO optimize calculate process, such as determinate and inverse
 
-    if eta.size()[-1] != 1:
-        aligned_eta = eta.unsqueeze(-1)
-    else:
-        aligned_eta = eta
-    if mu is not None and mu.size()[-1] != 1:
-        aligned_mu = mu.unsqueeze(-1)
-    else:
-        aligned_mu = mu
+    aligned_eta = eta.unsqueeze(-1)
+    aligned_mu = mu.unsqueeze(-1)
 
     dim = lam.size(-1)
     part1 = dim * np.log(np.pi * 2)
-    if len(lam.size()) == 2:
-        part2 = torch.log(torch.det(lam))
-    else:
-        # part2 = 2.0 * torch.sum(torch.log(torch.abs(torch.diagonal(torch.cholesky(lam),
-        #                                                            dim1=-1, dim2=-2))), dim=-1)
-        part2 = torch.det(lam)
+
+    part2 = torch.logdet(lam)
 
     if aligned_mu is not None:
         if len(aligned_eta.size()) > 1:

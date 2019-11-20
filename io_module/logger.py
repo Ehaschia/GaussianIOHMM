@@ -5,7 +5,7 @@ import sys
 import os
 
 
-def get_logger(name, level=logging.INFO, handler=sys.stdout,
+def get_logger(name, level=logging.INFO, handler=sys.stdout, log_dir=None,
                formatter='%(asctime)s - %(name)s - %(levelname)s - %(message)s'):
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
@@ -14,8 +14,16 @@ def get_logger(name, level=logging.INFO, handler=sys.stdout,
     stream_handler = logging.StreamHandler(handler)
     stream_handler.setLevel(level)
     stream_handler.setFormatter(formatter)
-
     logger.addHandler(stream_handler)
+    if log_dir is not None:
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        formatter = logging.Formatter(formatter)
+        fh = logging.FileHandler(log_dir + 'info.log')
+        fh.setLevel(level)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+
     return logger
 
 
