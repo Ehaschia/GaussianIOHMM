@@ -18,7 +18,6 @@ def get_logger(name, level=logging.INFO, handler=sys.stdout, log_dir=None,
     if log_dir is not None:
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
-        formatter = logging.Formatter(formatter)
         fh = logging.FileHandler(log_dir + 'info.log')
         fh.setLevel(level)
         fh.setFormatter(formatter)

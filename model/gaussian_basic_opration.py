@@ -17,14 +17,17 @@ def calculate_zeta(eta: torch.Tensor, lam: torch.Tensor,
     # TODO optimize calculate process, such as determinate and inverse
 
     aligned_eta = eta.unsqueeze(-1)
-    aligned_mu = mu.unsqueeze(-1)
+    if mu is not None:
+        aligned_mu = mu.unsqueeze(-1)
+    else:
+        aligned_mu = None
 
     dim = lam.size(-1)
     part1 = dim * np.log(np.pi * 2)
 
     part2 = torch.logdet(lam)
 
-    if aligned_mu is not None:
+    if mu is not None:
         if len(aligned_eta.size()) > 1:
             part3 = torch.matmul(aligned_eta.transpose(-2, -1), aligned_mu).reshape(aligned_eta.size()[:-2])
         else:
@@ -32,7 +35,7 @@ def calculate_zeta(eta: torch.Tensor, lam: torch.Tensor,
     else:
         if sig is None:  # and mu is None:
             sig = torch.inverse(lam)
-        part3 = torch.matmul(aligned_eta.transpose(-2, -1), torch.matmul(sig, aligned_eta)).squeeze()
+        part3 = torch.matmul(aligned_eta.transpose(-2, -1), torch.matmul(sig, aligned_eta)).reshape_as(part2)
 
     return -0.5 * (part1 - part2 + part3)
 
@@ -94,26 +97,35 @@ def gaussian_multi_integral(mu0: torch.Tensor, mu1: torch.Tensor,
     eta1_pad = F.pad(eta1, mu_pad, 'constant', 0)
     lambda1_pad = F.pad(lambda1, var_pad, 'constant', 0)
 
-    lambda_new = lambda0.unsqueeze(0) + lambda1_pad
-    eta_new = eta0.unsqueeze(0) + eta1_pad
+    lambda_new = lambda0 + lambda1_pad
+    eta_new = eta0 + eta1_pad
 
     sigma_new = torch.inverse(lambda_new)
     mu_new = torch.matmul(sigma_new, eta_new.unsqueeze(-1)).squeeze(-1)
 
     if need_zeta:
-        zeta0 = calculate_zeta(eta0.unsqueeze(-1), lambda0, mu=mu0_new)
-        zeta1 = calculate_zeta(eta1.unsqueeze(-1), lambda1, mu=mu1_new)
+        zeta0 = calculate_zeta(eta0, lambda0, mu=mu0)
+        zeta1 = calculate_zeta(eta1, lambda1, mu=mu1)
         zeta_new = calculate_zeta(eta_new, lambda_new, sig=sigma_new)
-
         scale = zeta0 + zeta1 - zeta_new
     else:
         scale = None
 
     if forward:
-        res_mu = mu_new[:, dim1:]
-        res_sigma = sigma_new[:, dim1:, dim1:]
+        res_mu = mu_new[:, :, :, dim1:]
+        res_sigma = sigma_new[:, :, :, dim1:, dim1:]
     else:
-        res_mu = mu_new[:, :dim1]
-        res_sigma = sigma_new[:, :dim1, :dim1]
+        res_mu = mu_new[:, :, :, dim1]
+        res_sigma = sigma_new[:, :, :, dim1, :dim1]
 
     return scale, res_mu, res_sigma
+
+
+def gaussian_top_k_pruning(score, mu, var, k=1):
+    if score.size()[-1] <= k:
+        return score, mu, var
+    pruned_score, index = torch.topk(score, k, dim=-1)
+    batch, _, dim = mu.size()
+    pruned_mu = torch.gather(mu, 1, index.view(batch, 1, 1).expand(batch, 1, dim))
+    pruned_var = torch.gather(var, 1, index.view(batch, 1, 1, 1).repeat(1, 1, dim, dim))
+    return pruned_score, pruned_mu, pruned_var

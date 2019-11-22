@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
 # in order to use the global variable
-import global_variables
+from global_variables import *
 from model.gaussian_basic_opration import *
 
 
@@ -56,22 +56,22 @@ class GaussianBatchLanguageModel(LanguageModel):
 
         self.transition_mu = Parameter(torch.empty(2 * self.dim), requires_grad=True)
         self.transition_cho = Parameter(
-            torch.empty(2 * self.dim, 2 * self.dim), requires_grad=global_variables.TRANSITION_CHO_GRAD)
+            torch.empty(2 * self.dim, 2 * self.dim), requires_grad=TRANSITION_CHO_GRAD)
 
         self.decoder_mu = Parameter(torch.empty(self.ntokens, self.dim), requires_grad=True)
         self.decoder_cho = Parameter(
-            torch.empty(self.ntokens, self.dim), requires_grad=global_variables.DECODE_CHO_GRAD)
+            torch.empty(self.ntokens, self.dim), requires_grad=DECODE_CHO_GRAD)
 
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
         reset_embedding(mu_embedding, self.emission_mu_embedding, self.dim, True,
-                        far_init=global_variables.FAR_EMISSION_MU)
-        reset_embedding(var_embedding, self.emission_cho_embedding, self.dim, global_variables.EMISSION_CHO_GRAD,
+                        far_init=FAR_EMISSION_MU)
+        reset_embedding(var_embedding, self.emission_cho_embedding, self.dim, EMISSION_CHO_GRAD,
                         far_init=False)
         self.reset_parameter(init_var_scale)
 
     def reset_parameter(self, init_var_scale):
-        if global_variables.FAR_TRANSITION_MU:
+        if FAR_TRANSITION_MU:
             nn.init.uniform_(self.transition_mu, a=-1.0, b=1.0)
         else:
             to_init_transition_mu = self.transition_mu.unsqueeze(0)
@@ -84,7 +84,7 @@ class GaussianBatchLanguageModel(LanguageModel):
         weight = torch.tril(weight)
         # weight = self.atma(weight)
         self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
-        if global_variables.FAR_DECODE_MU:
+        if FAR_DECODE_MU:
             nn.init.uniform_(self.decoder_mu, a=-1.0, b=1.0)
         else:
             nn.init.xavier_normal_(self.decoder_mu)
@@ -96,7 +96,7 @@ class GaussianBatchLanguageModel(LanguageModel):
         # var_weight = self.emission_var_embedding.weight.data
         # self.emission_var_embedding.weight.data = var_weight * var_weight
 
-    def forward(self, sentences: torch.Tensor, masks: torch.Tensor):
+    def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         batch, max_len = sentences.size()
         swapped_sentences = sentences.transpose(0, 1)
         # update transition cho to variance
@@ -117,7 +117,8 @@ class GaussianBatchLanguageModel(LanguageModel):
         for i in range(max_len):
             # update inside score from pred and current inside score
             _, part_mu, part_var = gaussian_multi_integral(trans_mu, inside_mu, trans_var, inside_var, need_zeta=False)
-            _, inside_mu, inside_var = gaussian_multi(part_mu, word_mu_mat[i], part_var, word_var_mat[i], need_zeta=False)
+            _, inside_mu, inside_var = gaussian_multi(part_mu, word_mu_mat[i], part_var, word_var_mat[i],
+                                                      need_zeta=False)
             holder_mu.append(inside_mu)
             holder_var.append(inside_var)
 
@@ -135,6 +136,126 @@ class GaussianBatchLanguageModel(LanguageModel):
 
         # shape [batch, len-1, vocab_size]
         real_score = score.squeeze()
+        return real_score
+
+
+class MixtureGaussianBatchLanguageModel(LanguageModel):
+    def __init__(self, dim: int, ntokens: int, mu_embedding=None,
+                 var_embedding=None, init_var_scale=1.0, i_comp_num=2,
+                 t_comp_num=2, o_compo_num=1, max_comp=10):
+        super(MixtureGaussianBatchLanguageModel, self).__init__()
+        self.dim = dim
+        self.ntokens = ntokens + 2
+        self.max_comp = max_comp
+        self.i_comp_num = i_comp_num
+        self.t_comp_num = t_comp_num
+        self.o_comp_num = o_compo_num
+        self.input_mu_embedding = nn.Embedding(self.ntokens, i_comp_num * self.dim)
+        self.input_cho_embedding = nn.Embedding(self.ntokens, i_comp_num * self.dim)
+
+        self.transition_mu = Parameter(torch.empty(t_comp_num, 2 * self.dim), requires_grad=True)
+        self.transition_cho = Parameter(
+            torch.empty(t_comp_num, 2 * self.dim, 2 * self.dim), requires_grad=TRANSITION_CHO_GRAD)
+
+        self.output_mu = Parameter(torch.empty(self.ntokens, o_compo_num * self.dim), requires_grad=True)
+        self.output_cho = Parameter(
+            torch.empty(self.ntokens, o_compo_num, self.dim), requires_grad=DECODE_CHO_GRAD)
+
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
+
+        reset_embedding(mu_embedding, self.input_mu_embedding, self.dim, True,
+                        far_init=FAR_EMISSION_MU)
+        reset_embedding(var_embedding, self.input_cho_embedding, self.dim, EMISSION_CHO_GRAD,
+                        far_init=False)
+        self.reset_parameter(init_var_scale)
+
+    def reset_parameter(self, init_var_scale):
+        if FAR_TRANSITION_MU:
+            nn.init.uniform_(self.transition_mu, a=-1.0, b=1.0)
+        else:
+            to_init_transition_mu = self.transition_mu.unsqueeze(0)
+            nn.init.xavier_normal_(to_init_transition_mu)
+            self.transition_mu.data = to_init_transition_mu.squeeze(0)
+        # here the init of var should be alert
+        nn.init.uniform_(self.transition_cho)
+        weight = self.transition_cho.data - 0.5
+        # maybe here we need to add some
+        weight = torch.tril(weight)
+        # weight = self.atma(weight)
+        self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
+        if FAR_DECODE_MU:
+            nn.init.uniform_(self.decoder_mu, a=-1.0, b=1.0)
+        else:
+            nn.init.xavier_normal_(self.output_mu)
+        nn.init.uniform_(self.output_cho)
+
+    def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        batch, max_len = sentences.size()
+        swapped_sentences = sentences.transpose(0, 1)
+
+        # update cho_embedding to var_embedding
+        input_mu_mat = self.input_mu_embedding(swapped_sentences).reshape(max_len, batch, self.i_comp_num, self.dim)
+        input_var_embedding = (self.input_cho_embedding(swapped_sentences) ** 2).reshape(max_len, batch,
+                                                                                         self.i_comp_num, self.dim)
+        input_var = torch.diag_embed(input_var_embedding).float()
+
+        output_var = torch.diag_embed(self.output_cho ** 2).float().reshape(self.ntokens, self.o_comp_num, self.dim,
+                                                                            self.dim)
+        holder_score = []
+        holder_mu = []
+        holder_var = []
+
+        # update transition cho to variance
+        trans_var = atma(self.transition_cho).reshape(1, 1, self.t_comp_num, 2 * self.dim, 2 * self.dim)
+        trans_mu = self.transition_mu.reshape(1, 1, self.t_comp_num, 2 * self.dim)
+        # init
+        prev_score = torch.zeros(batch, 1, 1)
+        prev_mu = torch.zeros(batch, 1, 1, self.dim, requires_grad=False)
+        prev_var = torch.eye(self.dim, requires_grad=False).repeat(batch, 1, 1).unsqueeze(1).unsqueeze(1)
+        for i in range(max_len):
+            # prev inside score multi transfer
+            part_score, part_mu, part_var = gaussian_multi_integral(trans_mu,
+                                                                    prev_mu,
+                                                                    trans_var,
+                                                                    prev_var,
+                                                                    need_zeta=True)
+            # part part multi current input
+            inside_score, inside_mu, inside_var = gaussian_multi(
+                part_mu.reshape(batch, -1, 1, self.dim),
+                input_mu_mat[i].reshape(batch, 1, self.i_comp_num, self.dim),
+                part_var.reshape(batch, -1, 1, self.dim, self.dim),
+                input_var[i].reshape(batch, 1, self.i_comp_num, self.dim, self.dim),
+                need_zeta=True)
+
+            real_inside_score = (part_score + prev_score).reshape(batch, -1, 1) + inside_score
+            # pruning
+            prev_score, prev_mu, prev_var = gaussian_top_k_pruning(real_inside_score.reshape(batch, -1),
+                                                                   inside_mu.reshape(batch, -1, self.dim),
+                                                                   inside_var.reshape(batch, -1, self.dim, self.dim),
+                                                                   k=1)
+            # TODO deal with not enough component
+            holder_score.append(prev_score)
+            holder_mu.append(prev_mu)
+            holder_var.append(prev_var)
+
+        # get right word, calculate
+        # pred_scores shape [batch, len, comp]
+        # pred_mus shape [batch, len, comp, dim]
+        # pred_vars shape [batch, len, comp, dim, dim]
+        pred_scores = torch.stack(holder_score, dim=1)
+        pred_mus = torch.stack(holder_mu, dim=1)
+        pred_vars = torch.stack(holder_var, dim=1)
+        # result should be [batch_size, len, comp1, comp2]
+        # here comp1 from pred part and comp2 from
+        score, _, _ = gaussian_multi(pred_mus.view(batch, max_len, 1, -1, 1, self.dim),
+                                     self.output_mu.view(1, 1, self.ntokens, 1, self.o_comp_num, self.dim),
+                                     pred_vars.view(batch, max_len, 1, -1, 1, self.dim, self.dim),
+                                     output_var.view(1, 1, self.ntokens, 1, self.o_comp_num, self.dim, self.dim),
+                                     need_zeta=True)
+
+        # shape [batch, len-1, vocab_size]
+        real_score = torch.logsumexp((pred_scores.unsqueeze(-1).unsqueeze(2) +
+                                      score).reshape(batch, max_len, self.ntokens, -1), dim=3)
         return real_score
 
 
