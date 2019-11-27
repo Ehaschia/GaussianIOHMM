@@ -4,6 +4,7 @@ from torch.nn import Parameter
 # in order to use the global variable
 from global_variables import *
 from model.gaussian_basic_opration import *
+from scipy.stats import invwishart
 
 
 def reset_embedding(init_embedding, embedding_layer, embedding_dim, trainable, far_init):
@@ -77,12 +78,11 @@ class GaussianBatchLanguageModel(LanguageModel):
             to_init_transition_mu = self.transition_mu.unsqueeze(0)
             nn.init.xavier_normal_(to_init_transition_mu)
             self.transition_mu.data = to_init_transition_mu.squeeze(0)
-        # here the init of var should be alert
+        # here the init of transition var should be alert
         nn.init.uniform_(self.transition_cho)
         weight = self.transition_cho.data - 0.5
         # maybe here we need to add some
         weight = torch.tril(weight)
-        # weight = self.atma(weight)
         self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
         if FAR_DECODE_MU:
             nn.init.uniform_(self.decoder_mu, a=-1.0, b=1.0)
@@ -139,10 +139,11 @@ class GaussianBatchLanguageModel(LanguageModel):
         return real_score
 
 
+# TODO debug this model. I guess we need a unit test.
 class MixtureGaussianBatchLanguageModel(LanguageModel):
     def __init__(self, dim: int, ntokens: int, mu_embedding=None,
-                 var_embedding=None, init_var_scale=1.0, i_comp_num=2,
-                 t_comp_num=2, o_compo_num=1, max_comp=10):
+                 var_embedding=None, init_var_scale=1.0, i_comp_num=1,
+                 t_comp_num=1, o_compo_num=1, max_comp=10):
         super(MixtureGaussianBatchLanguageModel, self).__init__()
         self.dim = dim
         self.ntokens = ntokens + 2
@@ -167,22 +168,29 @@ class MixtureGaussianBatchLanguageModel(LanguageModel):
                         far_init=FAR_EMISSION_MU)
         reset_embedding(var_embedding, self.input_cho_embedding, self.dim, EMISSION_CHO_GRAD,
                         far_init=False)
-        self.reset_parameter(init_var_scale)
+        self.reset_parameter(init_var_scale=init_var_scale)
 
-    def reset_parameter(self, init_var_scale):
+    def reset_parameter(self, trans_var_init='raw', init_var_scale=1.0):
         if FAR_TRANSITION_MU:
             nn.init.uniform_(self.transition_mu, a=-1.0, b=1.0)
         else:
             to_init_transition_mu = self.transition_mu.unsqueeze(0)
             nn.init.xavier_normal_(to_init_transition_mu)
             self.transition_mu.data = to_init_transition_mu.squeeze(0)
-        # here the init of var should be alert
-        nn.init.uniform_(self.transition_cho)
-        weight = self.transition_cho.data - 0.5
-        # maybe here we need to add some
-        weight = torch.tril(weight)
-        # weight = self.atma(weight)
-        self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
+        if trans_var_init == 'raw':
+            # here the init of var should be alert
+            nn.init.uniform_(self.transition_cho)
+            weight = self.transition_cho.data - 0.5
+            # maybe here we need to add some
+            weight = torch.tril(weight)
+            # weight = self.atma(weight)
+            self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
+        elif trans_var_init == 'wishart':
+            transition_var = invwishart.rvs(self.dim, np.eye(self.dim) / self.dim,
+                                            size=self.t_comp_num, random_state=None)
+            self.transition_cho.data = torch.from_numpy(np.linalg.cholesky(transition_var))
+        else:
+            raise ValueError("Error transition init method")
         if FAR_DECODE_MU:
             nn.init.uniform_(self.decoder_mu, a=-1.0, b=1.0)
         else:
