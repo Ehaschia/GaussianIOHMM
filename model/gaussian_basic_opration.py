@@ -67,8 +67,8 @@ def gaussian_multi(mu0: torch.Tensor, mu1: torch.Tensor,
 
 
 # if forward, integral the upper half. Else, lower half.
-# the first Gaussian is regarded as the emission/inside score.
-# the second Gaussian is regarded as the transition score.
+# the first Gaussian is regarded as the transition score.
+# the second Gaussian is regarded as the emission/inside score.
 def gaussian_multi_integral(mu0: torch.Tensor, mu1: torch.Tensor,
                             var0: torch.Tensor, var1: torch.Tensor,
                             forward: bool = True, need_zeta=True) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -111,12 +111,11 @@ def gaussian_multi_integral(mu0: torch.Tensor, mu1: torch.Tensor,
     else:
         scale = None
 
-    if forward:
-        res_mu = mu_new[:, :, :, dim1:]
-        res_sigma = sigma_new[:, :, :, dim1:, dim1:]
-    else:
-        res_mu = mu_new[:, :, :, dim1]
-        res_sigma = sigma_new[:, :, :, dim1, :dim1]
+    select = 1 if forward else 0
+
+    res_mu = torch.split(mu_new, split_size_or_sections=[dim1, dim1], dim=-1)[select]
+    res_sigma = torch.split(torch.split(sigma_new, split_size_or_sections=[dim1, dim1], dim=-2)[select],
+                            split_size_or_sections=[dim1, dim1], dim=-1)[select]
 
     return scale, res_mu, res_sigma
 

@@ -143,14 +143,14 @@ class GaussianBatchLanguageModel(LanguageModel):
 class MixtureGaussianBatchLanguageModel(LanguageModel):
     def __init__(self, dim: int, ntokens: int, mu_embedding=None,
                  var_embedding=None, init_var_scale=1.0, i_comp_num=1,
-                 t_comp_num=1, o_compo_num=1, max_comp=10):
+                 t_comp_num=1, o_comp_num=1, max_comp=10):
         super(MixtureGaussianBatchLanguageModel, self).__init__()
         self.dim = dim
         self.ntokens = ntokens + 2
         self.max_comp = max_comp
         self.i_comp_num = i_comp_num
         self.t_comp_num = t_comp_num
-        self.o_comp_num = o_compo_num
+        self.o_comp_num = o_comp_num
         self.input_mu_embedding = nn.Embedding(self.ntokens, i_comp_num * self.dim)
         self.input_cho_embedding = nn.Embedding(self.ntokens, i_comp_num * self.dim)
 
@@ -158,9 +158,9 @@ class MixtureGaussianBatchLanguageModel(LanguageModel):
         self.transition_cho = Parameter(
             torch.empty(t_comp_num, 2 * self.dim, 2 * self.dim), requires_grad=TRANSITION_CHO_GRAD)
 
-        self.output_mu = Parameter(torch.empty(self.ntokens, o_compo_num * self.dim), requires_grad=True)
+        self.output_mu = Parameter(torch.empty(self.ntokens, o_comp_num * self.dim), requires_grad=True)
         self.output_cho = Parameter(
-            torch.empty(self.ntokens, o_compo_num, self.dim), requires_grad=DECODE_CHO_GRAD)
+            torch.empty(self.ntokens, o_comp_num, self.dim), requires_grad=DECODE_CHO_GRAD)
 
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
@@ -197,6 +197,26 @@ class MixtureGaussianBatchLanguageModel(LanguageModel):
             nn.init.xavier_normal_(self.output_mu)
         nn.init.uniform_(self.output_cho)
 
+    # ALERT this method just used for unit test
+    def rewrite_parameter(self, dim, ntokens, i_comp_num, t_comp_num, o_comp_num, max_comp,
+                          input_mu, input_cho, trans_mu, trans_cho, out_mu, out_cho):
+        self.dim = dim
+        self.ntokens = ntokens
+        self.i_comp_num = i_comp_num
+        self.t_comp_num = t_comp_num
+        self.o_comp_num = o_comp_num
+        self.max_comp = max_comp
+        self.input_mu_embedding = nn.Embedding(self.ntokens, self.i_comp_num * self.dim)
+        self.input_mu_embedding.weight.data = input_mu
+        self.input_cho_embedding = nn.Embedding(self.ntokens, self.i_comp_num * self.dim)
+        self.input_cho_embedding.weight.data = input_cho
+        self.transition_mu.data = trans_mu
+        self.transition_cho.data = trans_cho
+        self.output_mu = Parameter(torch.empty(self.ntokens, self.o_comp_num * self.dim), requires_grad=True)
+        self.output_mu.data = out_mu
+        self.output_cho = Parameter(torch.empty(self.ntokens, self.o_comp_num * self.dim), requires_grad=True)
+        self.output_cho.data = out_cho
+
     def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         batch, max_len = sentences.size()
         swapped_sentences = sentences.transpose(0, 1)
@@ -222,10 +242,7 @@ class MixtureGaussianBatchLanguageModel(LanguageModel):
         prev_var = torch.eye(self.dim, requires_grad=False).repeat(batch, 1, 1).unsqueeze(1).unsqueeze(1)
         for i in range(max_len):
             # prev inside score multi transfer
-            part_score, part_mu, part_var = gaussian_multi_integral(trans_mu,
-                                                                    prev_mu,
-                                                                    trans_var,
-                                                                    prev_var,
+            part_score, part_mu, part_var = gaussian_multi_integral(trans_mu, prev_mu, trans_var, prev_var,
                                                                     need_zeta=True)
             # part part multi current input
             inside_score, inside_mu, inside_var = gaussian_multi(
@@ -240,7 +257,7 @@ class MixtureGaussianBatchLanguageModel(LanguageModel):
             prev_score, prev_mu, prev_var = gaussian_top_k_pruning(real_inside_score.reshape(batch, -1),
                                                                    inside_mu.reshape(batch, -1, self.dim),
                                                                    inside_var.reshape(batch, -1, self.dim, self.dim),
-                                                                   k=1)
+                                                                   k=self.max_comp)
             # TODO deal with not enough component
             holder_score.append(prev_score)
             holder_mu.append(prev_mu)
