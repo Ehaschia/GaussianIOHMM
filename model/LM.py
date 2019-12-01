@@ -3,23 +3,8 @@ import torch.nn.functional as F
 from torch.nn import Parameter
 # in order to use the global variable
 from global_variables import *
-from model.gaussian_basic_opration import *
+from model.basic_operation import *
 from scipy.stats import invwishart
-
-
-def reset_embedding(init_embedding, embedding_layer, embedding_dim, trainable, far_init):
-    if init_embedding is None:
-        # here random init the mu can be seen as the normal embedding
-        # but for the variance, maybe we should use other method to init it.
-        # Currently, the init only works for mu.
-        if far_init:
-            scale = 1.0
-        else:
-            scale = np.sqrt(3.0 / embedding_dim)
-        embedding_layer.weight.data.uniform_(-scale, scale)
-    else:
-        embedding_layer.load_state_dict({'weight': init_embedding})
-    embedding_layer.weight.requires_grad = trainable
 
 
 class LanguageModel(nn.Module):
@@ -139,7 +124,6 @@ class GaussianBatchLanguageModel(LanguageModel):
         return real_score
 
 
-# TODO debug this model. I guess we need a unit test.
 class MixtureGaussianBatchLanguageModel(LanguageModel):
     def __init__(self, dim: int, ntokens: int, mu_embedding=None,
                  var_embedding=None, init_var_scale=1.0, i_comp_num=1,

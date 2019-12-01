@@ -1,20 +1,18 @@
 # coding: utf-8
 import argparse
 import math
+import os
+import random
+import time
 from typing import List
 
+import torch.optim as optim
+from tqdm import tqdm
+
+import global_variables
 from io_module.data_loader import *
 from io_module.logger import get_logger, change_handler
-import numpy as np
 from model.LM import *
-import torch
-import torch.optim as optim
-import random
-import datetime
-import os
-from tqdm import tqdm
-import time
-import global_variables
 
 LOGGER = None
 
@@ -62,7 +60,7 @@ def main():
     parser.add_argument('--var_scale', type=float, default=1.0)
     parser.add_argument('--log_dir', type=str,
                         default='./output/' + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + "/")
-    parser.add_argument('--dim', type=int, default=5)
+    parser.add_argument('--dim', type=int, default=10)
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
 

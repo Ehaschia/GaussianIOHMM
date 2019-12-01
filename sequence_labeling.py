@@ -5,19 +5,16 @@ import os
 import random
 from typing import List
 
-import numpy as np
-import torch
 import torch.optim as optim
 from tqdm import tqdm
 
-from global_variables import *
 from io_module.data_loader import *
 from io_module.logger import get_logger
 from model.sequence_labeling import *
 
 
 # out is [batch, max_len+2]
-def standardize_batch(sample_list: List, nword=10, nlabel=10) -> (torch.Tensor, torch.Tensor):
+def standardize_batch(sample_list: List) -> (torch.Tensor, torch.Tensor):
     max_len = max([len(sentence[0]) for sentence in sample_list])
 
     standardized_sentence_list = []
@@ -26,18 +23,16 @@ def standardize_batch(sample_list: List, nword=10, nlabel=10) -> (torch.Tensor, 
     mask_list = []
     for sample in sample_list:
         sentence, label = sample
-        standardized_sentence = [nword] + sentence + [nword + 1] + [0] * (max_len - len(sentence))
-        standardized_label = [0] + label + [0] + [0] * (max_len - len(label))
-        mask = [0] + [1] * len(sentence) + [0] + [0] * (max_len - len(sentence))
+        standardized_sentence = sentence + [0] * (max_len - len(sentence))
+        standardized_label = label + [0] * (max_len - len(label))
+        mask = [1] * len(sentence) + [0] * (max_len - len(sentence))
         revert_idx = [i for i in range(len(sentence) + 2)][::-1] + [i for i in range(len(sentence) + 2, max_len + 2)]
         standardized_sentence_list.append(np.array(standardized_sentence))
         standardized_label_list.append(np.array(standardized_label))
         mask_list.append(np.array(mask))
         revert_idx_list.append(np.array(revert_idx))
-    return (torch.from_numpy(np.array(standardized_sentence_list)).long(),
-            torch.from_numpy(np.array(standardized_label_list)).long(),
-            torch.from_numpy(np.array(mask_list)).long(),
-            torch.from_numpy(np.array(revert_idx_list)).long())
+    return torch.tensor(standardized_sentence_list).long(), torch.tensor(standardized_label_list).long(),\
+           torch.tensor(mask_list).long(), torch.tensor(revert_idx_list).long()
 
 
 def main():
@@ -104,8 +99,8 @@ def main():
     test_dataset = sequence_labeling_data_loader(root, type='test')
 
     # build model
-    model = GaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels)
-    # model = RNNSequenceLabeling("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
+    # model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels)
+    model = RNNSequenceLabeling("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -119,16 +114,19 @@ def main():
         for j in tqdm(range(math.ceil(len(train_dataset) / batch_size))):
             samples = train_dataset[j * batch_size: (j + 1) * batch_size]
 
-            sentences, labels, masks, revert_order = standardize_batch(samples, nword=ntokens, nlabel=nlabels)
-            loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device), revert_order.to(device))
+            sentences, labels, masks, revert_order = standardize_batch(samples)
+            loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device))
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
             epoch_loss += (loss.item()) * sentences.size(0)
         logger.info('Epoch ' + str(i) + ' Loss: ' + str(round(epoch_loss / len(train_dataset), 4)))
-        dev_sentences, dev_labels, dev_masks, dev_revert_order = standardize_batch(dev_dataset, nword=ntokens, nlabel=nlabels)
-        acc, corr = model.get_acc(dev_sentences.to(device), dev_labels.to(device), dev_masks.to(device), revert_order.to(device))
-        logger.info("\t Dev Acc " + str(round(acc*100, 2)))
+        dev_sentences, dev_labels, dev_masks, dev_revert_order = standardize_batch(dev_dataset)
+        model.eval()
+        with torch.no_grad():
+            acc, corr = model.get_acc(dev_sentences.to(device), dev_labels.to(device),
+                                      dev_masks.to(device))
+            logger.info("\t Dev Acc " + str(round(acc.item()*100, 2)))
 
 
 if __name__ == '__main__':

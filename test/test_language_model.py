@@ -1,6 +1,6 @@
 import unittest
 from model.LM import MixtureGaussianBatchLanguageModel
-from model.gaussian_basic_opration import *
+from model.basic_operation import *
 
 class TestMixtureGaussianBatchLanguageModel(unittest.TestCase):
     def setUp(self) -> None:

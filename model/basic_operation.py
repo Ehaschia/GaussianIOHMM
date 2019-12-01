@@ -5,6 +5,17 @@ import numpy as np
 import torch.nn.functional as F
 
 
+def reset_embedding(init_embedding, embedding_layer, embedding_dim, trainable, far_init):
+    if init_embedding is None:
+        if far_init:
+            scale = 1.0
+        else:
+            scale = np.sqrt(3.0 / embedding_dim)
+        embedding_layer.weight.data.uniform_(-scale, scale)
+    else:
+        embedding_layer.load_state_dict({'weight': init_embedding})
+    embedding_layer.weight.requires_grad = trainable
+
 def atma(cholesky: torch.Tensor) -> torch.Tensor:
     return torch.matmul(cholesky.transpose(-2, -1), cholesky)
 

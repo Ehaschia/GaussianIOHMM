@@ -2,7 +2,7 @@ import unittest
 
 import math
 
-from model.gaussian_basic_opration import *
+from model.basic_operation import *
 
 
 class TestAtma(unittest.TestCase):
