@@ -105,7 +105,7 @@ def main():
     logger.info('Building model ' + model.__class__.__name__ + '...')
     optimizer = optim.Adam(model.parameters(), lr=lr)
     # depend on dev ppl
-    best_epoch = 0
+    best_epoch = (-1, 0.0)
     for i in range(epoch):
         epoch_loss = 0
         random.shuffle(train_dataset)
@@ -128,6 +128,9 @@ def main():
                                       dev_masks.to(device))
             logger.info("\t Dev Acc " + str(round(acc.item()*100, 2)))
 
+        if best_epoch[1] < acc:
+            best_epoch = (i, acc.item())
+    logger.info("Best Epoch: " + str(best_epoch[0]) + " + ACC: " + str(round(best_epoch[1], 5)))
 
 if __name__ == '__main__':
     main()
