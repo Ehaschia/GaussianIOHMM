@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.nn import Parameter
 from global_variables import *
 from scipy.stats import invwishart
+from model.inverse_wishart_distribution import InvWishart
 
 
 class GaussianSequenceLabeling(nn.Module):
@@ -227,7 +228,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         nn.init.uniform_(self.output_cho)
 
     #
-    # # TODO rewrite the forward backward part to alignment with the expected count part
+    # This function is flip backward by sentence length
     # def forward(self, sentences: torch.Tensor, backward_order: torch.Tensor) -> torch.Tensor:
     #     batch, max_len = sentences.size()
     #     swapped_sentences = sentences.transpose(0, 1)
@@ -393,9 +394,8 @@ class MixtureGaussianSequenceLabeling(nn.Module):
     #     real_score = torch.logsumexp((score + expected_count_scores.view(batch, max_len-1, 1, -1, 1)).view(batch, max_len-1, self.ntokens, -1), dim=-1)
     #     return real_score
 
-    # TODO rewrite the forward backward part to alignment with the expected count part
     # In this forward we simple revert the sentence
-    def forward(self, sentences: torch.Tensor, backward_order: torch.Tensor) -> torch.Tensor:
+    def forward(self, sentences: torch.Tensor) -> torch.Tensor:
         batch, max_len = sentences.size()
         swapped_sentences = sentences.transpose(0, 1)
 
@@ -416,9 +416,10 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
         # init
         # shape [batch, pre_comp, trans_comp, dim, dim]
-        init_score = torch.zeros(batch, 1, 1)
-        init_mu = torch.zeros(batch, 1, 1, self.dim, requires_grad=False)
-        init_var = torch.eye(self.dim, requires_grad=False).repeat(batch, 1, 1).unsqueeze(1).unsqueeze(1)
+        init_score = torch.zeros(batch, 1, 1).to(sentences.device)
+        init_mu = torch.zeros(batch, 1, 1, self.dim, requires_grad=False).to(sentences.device)
+        init_var = torch.eye(self.dim,
+                             requires_grad=False).repeat(batch, 1, 1).unsqueeze(1).unsqueeze(1).to(sentences.device)
 
         forward_prev_score = init_score.view(batch, 1, 1)
         forward_prev_mu = init_mu.view(batch, 1, 1, self.dim)
@@ -446,11 +447,11 @@ class MixtureGaussianSequenceLabeling(nn.Module):
                 forward_prev_var.view(batch, -1, 1, self.dim, self.dim),
                 forward_input_var_mat[i].view(batch, 1, self.i_comp_num, self.dim, self.dim),
                 need_zeta=True)
-            part_score, part_mu, part_var = gaussian_multi_integral(trans_mu.view(1, 1, self.t_comp_num, 2*self.dim),
+            part_score, part_mu, part_var = gaussian_multi_integral(trans_mu.view(1, 1, self.t_comp_num, 2 * self.dim),
                                                                     forward_mu.view(batch, -1, 1, self.dim),
-                                                                    trans_var.view(1, 1, self.t_comp_num, 2*self.dim,
-                                                                                   2*self.dim),
-                                                                    forward_var.view(batch, -1, 1, self.dim,self.dim),
+                                                                    trans_var.view(1, 1, self.t_comp_num, 2 * self.dim,
+                                                                                   2 * self.dim),
+                                                                    forward_var.view(batch, -1, 1, self.dim, self.dim),
                                                                     need_zeta=True, forward=True)
 
             # real_forward_score = (part_score + forward_prev_score).reshape(batch, -1, 1) + forward_score
@@ -496,7 +497,6 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         backward_input_var_mat = torch.diag_embed(backward_input_var_embedding).float()
 
         for i in range(max_len):
-
             backward_score, backward_mu, backward_var = gaussian_multi(
                 backward_prev_mu.view(batch, -1, 1, self.dim),
                 backward_input_mu_mat[i].view(batch, 1, self.i_comp_num, self.dim),
@@ -504,10 +504,10 @@ class MixtureGaussianSequenceLabeling(nn.Module):
                 backward_input_var_mat[i].view(batch, 1, self.i_comp_num, self.dim, self.dim),
                 need_zeta=True)
 
-            part_score, part_mu, part_var = gaussian_multi_integral(trans_mu.view(1, 1, self.t_comp_num, 2*self.dim),
+            part_score, part_mu, part_var = gaussian_multi_integral(trans_mu.view(1, 1, self.t_comp_num, 2 * self.dim),
                                                                     backward_mu.view(batch, -1, 1, self.dim),
-                                                                    trans_var.view(1, 1, self.t_comp_num, 2*self.dim,
-                                                                                   2*self.dim),
+                                                                    trans_var.view(1, 1, self.t_comp_num, 2 * self.dim,
+                                                                                   2 * self.dim),
                                                                     backward_var.view(batch, -1, 1, self.dim, self.dim),
                                                                     need_zeta=True, forward=True)
 
@@ -586,24 +586,36 @@ class MixtureGaussianSequenceLabeling(nn.Module):
                                      need_zeta=True)
 
         # shape [batch, len-1, vocab_size]
-        real_score = torch.logsumexp((score + expected_count_scores.view(batch, max_len, 1, -1, 1)).view(batch, max_len, self.nlabels, -1), dim=-1)
+        real_score = torch.logsumexp(
+            (score + expected_count_scores.view(batch, max_len, 1, -1, 1)).view(batch, max_len, self.nlabels, -1),
+            dim=-1)
         return real_score
 
     def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor,
-                 masks: torch.Tensor, backward_order: torch.Tensor) -> torch.Tensor:
-        real_score = self.forward(sentences, backward_order)
+                 masks: torch.Tensor, wishart=False) -> torch.Tensor:
+        real_score = self.forward(sentences)
         prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels) * masks
         # the loss format can fine tune. According to zechuan's investigation.
-        return torch.sum(prob) / sentences.size(0)
+        if wishart:
+            input_cho = self.input_cho_embedding(sentences).view(-1, self.dim).diag_embed()
+            trans_cho = self.transition_cho.view(1, self.dim, self.dim)
+            output_cho = self.output_cho.view(-1, self.dim).diag_embed()
+            reg = torch.sum(InvWishart.logpdf(input_cho, self.dim, torch.eye(self.dim))) + \
+                        torch.sum(InvWishart.logpdf(trans_cho, self.dim, torch.eye(self.dim))) + \
+                        torch.sum(InvWishart.logpdf(output_cho, self.dim, torch.eye(self.dim)))
+        else:
+            reg = 0.0
 
+        return (torch.sum(prob) - reg) / sentences.size(0)
 
     def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor,
-                masks: torch.Tensor, backward_order: torch.Tensor) -> Tuple:
-        real_score = self.forward(sentences, backward_order)
+                masks: torch.Tensor) -> Tuple:
+        real_score = self.forward(sentences)
         pred = torch.argmax(real_score, dim=-1).cpu().numpy()
         corr = np.sum(np.equal(pred, labels.cpu().numpy()) * masks.cpu().numpy())
         total = np.sum(masks.cpu().numpy())
         return corr / total, corr
+
 
 class RNNSequenceLabeling(nn.Module):
     def __init__(self, rnn_type, ntokens, nlabels, ninp, nhid, nlayers=1, dropout=0.0, tie_weights=False):

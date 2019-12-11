@@ -87,7 +87,6 @@ def main():
     logger.info('FAR_TRANSITION_MU:' + str(FAR_TRANSITION_MU))
     logger.info('FAR_DECODE_MU:' + str(FAR_DECODE_MU))
     logger.info('FAR_EMISSION_MU:' + str(FAR_EMISSION_MU))
-    # TODO temp
     logger.info('RANDOM_SEED:' + str(args.random_seed))
 
     device = torch.device('cuda') if args.gpu else torch.device('cpu')
@@ -99,8 +98,8 @@ def main():
     test_dataset = sequence_labeling_data_loader(root, type='test')
 
     # build model
-    # model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels)
-    model = RNNSequenceLabeling("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
+    model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels)
+    # model = RNNSequenceLabeling("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -130,7 +129,7 @@ def main():
 
         if best_epoch[1] < acc:
             best_epoch = (i, acc.item())
-    logger.info("Best Epoch: " + str(best_epoch[0]) + " + ACC: " + str(round(best_epoch[1], 5)))
+    logger.info("Best Epoch: " + str(best_epoch[0]) + " ACC: " + str(round(best_epoch[1], 5)))
 
 if __name__ == '__main__':
     main()
