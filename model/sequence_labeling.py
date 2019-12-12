@@ -166,9 +166,11 @@ class GaussianSequenceLabeling(nn.Module):
         return corr / total, corr
 
 
+# cho init 0 means random, else means init scale
 class MixtureGaussianSequenceLabeling(nn.Module):
     def __init__(self, dim: int, ntokens: int, nlabels: int,
-                 mu_embedding=None, var_embedding=None, init_var_scale=1.0,
+                 in_cho_init=0, t_cho_init=0, out_cho_init=0,
+                 t_cho_method='random', mu_embedding=None, var_embedding=None,
                  i_comp_num=1, t_comp_num=1, o_comp_num=1, max_comp=1,
                  in_mu_drop=0.0, in_cho_drop=0.0, out_mu_drop=0.0,
                  out_cho_drop=0.0, t_mu_drop=0.0, t_cho_drop=0.0):
@@ -202,10 +204,15 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
         reset_embedding(mu_embedding, self.input_mu_embedding, self.dim, True, far_init=FAR_EMISSION_MU)
-        reset_embedding(var_embedding, self.input_cho_embedding, self.dim, EMISSION_CHO_GRAD, far_init=False)
-        self.reset_parameter(init_var_scale=init_var_scale)
 
-    def reset_parameter(self, trans_var_init='raw', init_var_scale=1.0):
+        # init the var
+        if in_cho_init != 0:
+            var_embedding = torch.empty(self.ntokens, self.i_comp_num*self.dim)
+            nn.init.constant_(var_embedding, in_cho_init)
+        reset_embedding(var_embedding, self.input_cho_embedding, self.dim, EMISSION_CHO_GRAD, far_init=False)
+        self.reset_parameter(trans_cho_method=t_cho_method, output_cho_scale=out_cho_init, t_cho_scale=t_cho_init)
+
+    def reset_parameter(self, trans_cho_method='random', output_cho_scale=0, t_cho_scale=0):
         # transition mu init
         if FAR_TRANSITION_MU:
             nn.init.uniform_(self.transition_mu, a=-1.0, b=1.0)
@@ -214,12 +221,12 @@ class MixtureGaussianSequenceLabeling(nn.Module):
             nn.init.xavier_normal_(to_init_transition_mu)
             self.transition_mu.data = to_init_transition_mu.squeeze(0)
         # transition var init
-        if trans_var_init == 'raw':
+        if trans_cho_method == 'random':
             nn.init.uniform_(self.transition_cho)
             weight = self.transition_cho.data - 0.5
             weight = torch.tril(weight)
-            self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
-        elif trans_var_init == 'wishart':
+            self.transition_cho.data = weight + t_cho_scale * torch.eye(2 * self.dim)
+        elif trans_cho_method == 'wishart':
             transition_var = invwishart.rvs(self.dim, np.eye(self.dim) / self.dim,
                                             size=self.t_comp_num, random_state=None)
             self.transition_cho.data = torch.from_numpy(np.linalg.cholesky(transition_var))
@@ -227,11 +234,14 @@ class MixtureGaussianSequenceLabeling(nn.Module):
             raise ValueError("Error transition init method")
         # output mu init
         if FAR_DECODE_MU:
-            nn.init.uniform_(self.decoder_mu, a=-1.0, b=1.0)
+            nn.init.uniform_(self.output_mu, a=-1.0, b=1.0)
         else:
             nn.init.xavier_normal_(self.output_mu)
         # output var init
-        nn.init.uniform_(self.output_cho)
+        if output_cho_scale == 0:
+            nn.init.uniform_(self.output_cho)
+        else:
+            nn.init.constant_(self.output_cho, out_cho_scale)
 
     #
     # This function is flip backward by sentence length

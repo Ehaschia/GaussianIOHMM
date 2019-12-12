@@ -4,6 +4,7 @@ import math
 import os
 import random
 from typing import List
+import json
 
 import torch.optim as optim
 from tqdm import tqdm
@@ -31,8 +32,13 @@ def standardize_batch(sample_list: List) -> (torch.Tensor, torch.Tensor):
         standardized_label_list.append(np.array(standardized_label))
         mask_list.append(np.array(mask))
         revert_idx_list.append(np.array(revert_idx))
-    return torch.tensor(standardized_sentence_list).long(), torch.tensor(standardized_label_list).long(),\
+    return torch.tensor(standardized_sentence_list).long(), torch.tensor(standardized_label_list).long(), \
            torch.tensor(mask_list).long(), torch.tensor(revert_idx_list).long()
+
+
+def save_parameter_to_json(path, parameters):
+    with open(path + 'param.json', 'w') as f:
+        json.dump(parameters, f)
 
 
 def main():
@@ -59,6 +65,13 @@ def main():
     parser.add_argument('--t_cho_drop', type=float, default=0.0)
     parser.add_argument('--out_mu_drop', type=float, default=0.0)
     parser.add_argument('--out_cho_drop', type=float, default=0.0)
+    parser.add_argument('--trans_cho_method', type=str, choices=['random', 'wishart'], default='random')
+    parser.add_argument('--input_cho_init', type=float, default=0.0,
+                        help='init method of input cholesky matrix. 0 means random. The other score means constant')
+    parser.add_argument('--trans_cho_init', type=float, default=1.0,
+                        help='init added scale of random version init_cho_init')
+    parser.add_argument('--output_cho_init', type=float, default=0.0,
+                        help='init method of output cholesky matrix. 0 means random. The other score means constant')
 
     args = parser.parse_args()
     # np.random.seed(global_variables.RANDOM_SEED)
@@ -69,6 +82,7 @@ def main():
     torch.manual_seed(args.random_seed)
     random.seed(args.random_seed)
 
+    log_dir = args.log_dir
     epoch = args.epoch
     batch_size = args.batch
     lr = args.lr
@@ -80,9 +94,14 @@ def main():
     t_cho_drop = args.t_cho_drop
     out_mu_drop = args.out_mu_drop
     out_cho_drop = args.out_cho_drop
+    tran_cho_method = args.trans_cho_method
+    input_cho_init = args.input_cho_init
+    trans_cho_init = args.trans_cho_init
+    output_cho_init = args.output_cho_init
 
-    if not os.path.exists(args.log_dir):
-        os.makedirs(args.log_dir)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    save_parameter_to_json(log_dir, vars(args))
     # TODO ntokens generate from dataset
     ntokens = 1000
     nlabels = 5
@@ -110,6 +129,8 @@ def main():
 
     # build model
     model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels,
+                                            t_cho_method=tran_cho_method, t_cho_init=trans_cho_init,
+                                            in_cho_init=input_cho_init, out_cho_init=output_cho_init,
                                             in_mu_drop=in_mu_drop, in_cho_drop=in_cho_drop,
                                             t_mu_drop=t_mu_drop, t_cho_drop=t_cho_drop,
                                             out_mu_drop=out_mu_drop, out_cho_drop=out_cho_drop)
@@ -139,11 +160,12 @@ def main():
         with torch.no_grad():
             acc, corr = model.get_acc(dev_sentences.to(device), dev_labels.to(device),
                                       dev_masks.to(device))
-            logger.info("\t Dev Acc " + str(round(acc.item()*100, 2)))
+            logger.info("\t Dev Acc " + str(round(acc.item() * 100, 2)))
 
         if best_epoch[1] < acc:
             best_epoch = (i, acc.item())
     logger.info("Best Epoch: " + str(best_epoch[0]) + " ACC: " + str(round(best_epoch[1], 5)))
+
 
 if __name__ == '__main__':
     main()
