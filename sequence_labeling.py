@@ -53,6 +53,12 @@ def main():
     parser.add_argument('--dim', type=int, default=10)
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
+    parser.add_argument('--in_mu_drop', type=float, default=0.0)
+    parser.add_argument('--in_cho_drop', type=float, default=0.0)
+    parser.add_argument('--t_mu_drop', type=float, default=0.0)
+    parser.add_argument('--t_cho_drop', type=float, default=0.0)
+    parser.add_argument('--out_mu_drop', type=float, default=0.0)
+    parser.add_argument('--out_cho_drop', type=float, default=0.0)
 
     args = parser.parse_args()
     # np.random.seed(global_variables.RANDOM_SEED)
@@ -68,6 +74,12 @@ def main():
     lr = args.lr
     momentum = args.momentum
     root = args.data
+    in_mu_drop = args.in_mu_drop
+    in_cho_drop = args.in_cho_drop
+    t_mu_drop = args.t_mu_drop
+    t_cho_drop = args.t_cho_drop
+    out_mu_drop = args.out_mu_drop
+    out_cho_drop = args.out_cho_drop
 
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
@@ -90,7 +102,6 @@ def main():
     logger.info('RANDOM_SEED:' + str(args.random_seed))
 
     device = torch.device('cuda') if args.gpu else torch.device('cpu')
-    print(torch.cuda.is_available())
     # Loading data
     logger.info('Load data....')
     train_dataset = sequence_labeling_data_loader(root, type='train')
@@ -98,7 +109,10 @@ def main():
     test_dataset = sequence_labeling_data_loader(root, type='test')
 
     # build model
-    model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels)
+    model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels,
+                                            in_mu_drop=in_mu_drop, in_cho_drop=in_cho_drop,
+                                            t_mu_drop=t_mu_drop, t_cho_drop=t_cho_drop,
+                                            out_mu_drop=out_mu_drop, out_cho_drop=out_cho_drop)
     # model = RNNSequenceLabeling("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')

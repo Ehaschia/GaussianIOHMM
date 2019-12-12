@@ -167,8 +167,11 @@ class GaussianSequenceLabeling(nn.Module):
 
 
 class MixtureGaussianSequenceLabeling(nn.Module):
-    def __init__(self, dim: int, ntokens: int, nlabels: int, mu_embedding=None, var_embedding=None, init_var_scale=1.0,
-                 i_comp_num=1, t_comp_num=1, o_comp_num=1, max_comp=1):
+    def __init__(self, dim: int, ntokens: int, nlabels: int,
+                 mu_embedding=None, var_embedding=None, init_var_scale=1.0,
+                 i_comp_num=1, t_comp_num=1, o_comp_num=1, max_comp=1,
+                 in_mu_drop=0.0, in_cho_drop=0.0, out_mu_drop=0.0,
+                 out_cho_drop=0.0, t_mu_drop=0.0, t_cho_drop=0.0):
         super(MixtureGaussianSequenceLabeling, self).__init__()
 
         self.dim = dim
@@ -181,14 +184,20 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         # parameter init
         self.input_mu_embedding = nn.Embedding(self.ntokens, self.i_comp_num * self.dim)
         self.input_cho_embedding = nn.Embedding(self.ntokens, self.i_comp_num * self.dim)
+        self.input_mu_dropout = nn.Dropout(in_mu_drop)
+        self.input_cho_dropout = nn.Dropout(in_cho_drop)
 
         self.transition_mu = Parameter(torch.empty(self.t_comp_num, 2 * self.dim), requires_grad=True)
         self.transition_cho = Parameter(
             torch.empty(self.t_comp_num, 2 * self.dim, 2 * self.dim), requires_grad=TRANSITION_CHO_GRAD)
+        self.trans_mu_dropout = nn.Dropout(t_mu_drop)
+        self.trans_cho_dropout = nn.Dropout(t_cho_drop)
 
         self.output_mu = Parameter(torch.empty(self.nlabels, self.o_comp_num * self.dim), requires_grad=True)
         self.output_cho = Parameter(torch.empty(self.nlabels, self.o_comp_num * self.dim),
                                     requires_grad=DECODE_CHO_GRAD)
+        self.output_mu_dropout = nn.Dropout(out_mu_drop)
+        self.output_cho_dropout = nn.Dropout(out_cho_drop)
 
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
@@ -206,12 +215,9 @@ class MixtureGaussianSequenceLabeling(nn.Module):
             self.transition_mu.data = to_init_transition_mu.squeeze(0)
         # transition var init
         if trans_var_init == 'raw':
-            # here the init of var should be alert
             nn.init.uniform_(self.transition_cho)
             weight = self.transition_cho.data - 0.5
-            # maybe here we need to add some
             weight = torch.tril(weight)
-            # weight = self.atma(weight)
             self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
         elif trans_var_init == 'wishart':
             transition_var = invwishart.rvs(self.dim, np.eye(self.dim) / self.dim,
@@ -401,18 +407,17 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
         # update cho_embedding to var_embedding
         # shape [length, batch, comp, dim]
-        forward_input_mu_mat = self.input_mu_embedding(swapped_sentences).reshape(max_len, batch, self.i_comp_num,
-                                                                                  self.dim)
-        forward_input_var_embedding = (self.input_cho_embedding(swapped_sentences) ** 2).reshape(max_len, batch,
-                                                                                                 self.i_comp_num,
-                                                                                                 self.dim)
+        forward_input_mu_mat = self.input_mu_dropout(self.input_mu_embedding(swapped_sentences).
+                                                     reshape(max_len, batch, self.i_comp_num, self.dim))
+        forward_input_var_embedding = (self.input_cho_dropout(self.input_cho_embedding(swapped_sentences)) ** 2).reshape(max_len, batch, self.i_comp_num, self.dim)
         forward_input_var_mat = torch.diag_embed(forward_input_var_embedding).float()
 
-        output_var = torch.diag_embed(self.output_cho ** 2).float().reshape(self.nlabels, self.o_comp_num,
-                                                                            self.dim, self.dim)
+        # name reuse, ugly. Need to approve
+        output_mu = self.output_mu_dropout(self.output_mu)
+        output_var = torch.diag_embed(self.output_cho_dropout(self.output_cho) ** 2).float().reshape(self.nlabels, self.o_comp_num, self.dim, self.dim)
 
-        trans_mu = self.transition_mu.reshape(1, 1, self.t_comp_num, 2 * self.dim)
-        trans_var = atma(self.transition_cho).reshape(1, 1, self.t_comp_num, 2 * self.dim, 2 * self.dim)
+        trans_mu = self.trans_mu_dropout(self.transition_mu).reshape(1, 1, self.t_comp_num, 2 * self.dim)
+        trans_var = atma(self.trans_cho_dropout(self.transition_cho)).reshape(1, 1, self.t_comp_num, 2 * self.dim, 2 * self.dim)
 
         # init
         # shape [batch, pre_comp, trans_comp, dim, dim]
@@ -580,7 +585,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
         # DEBUG debug the length here.
         score, _, _ = gaussian_multi(expected_count_mus.view(batch, max_len, 1, -1, 1, self.dim),
-                                     self.output_mu.view(1, 1, self.nlabels, 1, self.o_comp_num, self.dim),
+                                     output_mu.view(1, 1, self.nlabels, 1, self.o_comp_num, self.dim),
                                      expected_count_vars.view(batch, max_len, 1, -1, 1, self.dim, self.dim),
                                      output_var.view(1, 1, self.nlabels, 1, self.o_comp_num, self.dim, self.dim),
                                      need_zeta=True)
@@ -597,12 +602,9 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels) * masks
         # the loss format can fine tune. According to zechuan's investigation.
         if wishart:
-            input_cho = self.input_cho_embedding(sentences).view(-1, self.dim).diag_embed()
-            trans_cho = self.transition_cho.view(1, self.dim, self.dim)
-            output_cho = self.output_cho.view(-1, self.dim).diag_embed()
-            reg = torch.sum(InvWishart.logpdf(input_cho, self.dim, torch.eye(self.dim))) + \
-                        torch.sum(InvWishart.logpdf(trans_cho, self.dim, torch.eye(self.dim))) + \
-                        torch.sum(InvWishart.logpdf(output_cho, self.dim, torch.eye(self.dim)))
+            # here our gaussian only trans is non-diagonal. Thus this regularization only suit trans.
+            trans_cho = self.transition_cho.view(1, 2*self.dim, 2*self.dim)
+            reg = torch.sum(InvWishart.logpdf(trans_cho, self.dim, torch.eye(2*self.dim)))
         else:
             reg = 0.0
 
