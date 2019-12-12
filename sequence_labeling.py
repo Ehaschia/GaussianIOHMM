@@ -10,7 +10,7 @@ import torch.optim as optim
 from tqdm import tqdm
 
 from io_module.data_loader import *
-from io_module.logger import get_logger
+from io_module.logger import *
 from model.sequence_labeling import *
 
 
@@ -34,6 +34,19 @@ def standardize_batch(sample_list: List) -> (torch.Tensor, torch.Tensor):
         revert_idx_list.append(np.array(revert_idx))
     return torch.tensor(standardized_sentence_list).long(), torch.tensor(standardized_label_list).long(), \
            torch.tensor(mask_list).long(), torch.tensor(revert_idx_list).long()
+
+
+def evaluate(data, batch, model, device):
+    model.eval()
+    total_token_num = 0
+    corr_token_num = 0
+    with torch.no_grad():
+        for i in range(math.ceil(len(data) / batch)):
+            sentences, labels, masks, revert_order = standardize_batch(data[i * batch: (i + 1) * batch])
+            acc, corr = model.get_acc(sentences.to(device), labels.to(device), masks.to(device))
+            corr_token_num += corr
+            total_token_num += torch.sum(masks).item()
+    return corr_token_num / total_token_num, corr_token_num
 
 
 def save_parameter_to_json(path, parameters):
@@ -72,6 +85,15 @@ def main():
                         help='init added scale of random version init_cho_init')
     parser.add_argument('--output_cho_init', type=float, default=0.0,
                         help='init method of output cholesky matrix. 0 means random. The other score means constant')
+    # i_comp_num = 1, t_comp_num = 1, o_comp_num = 1, max_comp = 1,
+    parser.add_argument('--input_comp_num', type=int, default=1,
+                        help='input mixture gaussian component number')
+    parser.add_argument('--tran_comp_num', type=int, default=1,
+                        help='transition mixture gaussian component number')
+    parser.add_argument('--output_comp_num', type=int, default=1,
+                        help='output mixture gaussian component number')
+    parser.add_argument('--max_comp', type=int, default=1,
+                        help='number of max number of component')
 
     args = parser.parse_args()
     # np.random.seed(global_variables.RANDOM_SEED)
@@ -98,6 +120,10 @@ def main():
     input_cho_init = args.input_cho_init
     trans_cho_init = args.trans_cho_init
     output_cho_init = args.output_cho_init
+    input_num_comp = args.input_comp_num
+    tran_num_comp = args.tran_comp_num
+    output_num_comp = args.output_comp_num
+    max_comp = args.max_comp
 
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -107,6 +133,7 @@ def main():
     nlabels = 5
     # save parameter
     logger = get_logger('Sequence-Labeling')
+    change_handler(logger, log_dir)
     # logger = LOGGER
     logger.info(args)
 
@@ -133,13 +160,16 @@ def main():
                                             in_cho_init=input_cho_init, out_cho_init=output_cho_init,
                                             in_mu_drop=in_mu_drop, in_cho_drop=in_cho_drop,
                                             t_mu_drop=t_mu_drop, t_cho_drop=t_cho_drop,
-                                            out_mu_drop=out_mu_drop, out_cho_drop=out_cho_drop)
+                                            out_mu_drop=out_mu_drop, out_cho_drop=out_cho_drop,
+                                            i_comp_num=input_num_comp, t_comp_num=tran_num_comp,
+                                            o_comp_num=output_num_comp, max_comp=max_comp)
+
     # model = RNNSequenceLabeling("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     optimizer = optim.Adam(model.parameters(), lr=lr)
     # depend on dev ppl
-    best_epoch = (-1, 0.0)
+    best_epoch = (-1, 0.0, 0.0)
     for i in range(epoch):
         epoch_loss = 0
         random.shuffle(train_dataset)
@@ -155,16 +185,21 @@ def main():
             optimizer.zero_grad()
             epoch_loss += (loss.item()) * sentences.size(0)
         logger.info('Epoch ' + str(i) + ' Loss: ' + str(round(epoch_loss / len(train_dataset), 4)))
-        dev_sentences, dev_labels, dev_masks, dev_revert_order = standardize_batch(dev_dataset)
-        model.eval()
-        with torch.no_grad():
-            acc, corr = model.get_acc(dev_sentences.to(device), dev_labels.to(device),
-                                      dev_masks.to(device))
-            logger.info("\t Dev Acc " + str(round(acc.item() * 100, 2)))
-
+        acc, corr = evaluate(dev_dataset, batch_size, model, device)
+        logger.info('\t Dev Acc: ' + str(round(acc * 100, 3)))
         if best_epoch[1] < acc:
-            best_epoch = (i, acc.item())
-    logger.info("Best Epoch: " + str(best_epoch[0]) + " ACC: " + str(round(best_epoch[1], 5)))
+            test_acc, _ = evaluate(test_dataset, batch_size, model, device)
+            logger.info('\t Test Acc: ' + str(round(test_acc * 100, 3)))
+            best_epoch = (i, acc, test_acc)
+
+    logger.info("Best Epoch: " + str(best_epoch[0]) + " Dev ACC: " + str(round(best_epoch[1] * 100, 3)) +
+                "Test ACC: " + str(round(best_epoch[2] * 100, 3)))
+
+    with open(log_dir + '/' + 'result.json', 'w') as f:
+        final_result = {"Epoch": best_epoch[0],
+                        "Dev": best_epoch[1] * 100,
+                        "Test": best_epoch[2] * 100}
+        json.dump(final_result, f)
 
 
 if __name__ == '__main__':
