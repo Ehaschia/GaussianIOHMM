@@ -18,9 +18,9 @@ parameters = {
     'data': ['./dataset/syntic_data_yong/0-1000-10-new', './dataset/syntic_data_yong/0-3000-10-new',
              './dataset/syntic_data_yong/0-10000-10-new', './dataset/syntic_data_yong/0-30000-10-new',
              './dataset/syntic_data_yong/0-10000-10-new'],
-    'batch': ['8', '16', '32', '64', '128'],
-    'dim': ['5', '10', '15'],
-    'random_seed': ['1', '2', '3', '4', '5'],
+    'batch': ['8', '32', '128'],
+    'dim': ['10'],
+    'random_seed': ['1', '2', '3'],
     'in_mu_drop': ['0.0', '0.2', '0.5'],
     't_mu_drop': ['0.0', '0.2', '0.5'],
     'out_mu_drop': ['0.0', '0.2', '0.5'],
@@ -44,7 +44,7 @@ def dfs(config, idx):
 
 
 def config_generate(config):
-    return prefix + '\n' + python + ' ' + file + ' '.join(config) + '\n' + suffix
+    return prefix + '\n' + python + ' ' + file + ' ' + ' '.join(config) + '\n' + suffix
 
 
 def configs_generate():

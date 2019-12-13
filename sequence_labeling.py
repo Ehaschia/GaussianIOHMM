@@ -1,10 +1,9 @@
 # coding: utf-8
 import argparse
+import json
 import math
-import os
 import random
 from typing import List
-import json
 
 import torch.optim as optim
 from tqdm import tqdm

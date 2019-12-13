@@ -30,14 +30,15 @@ def multiprocess(configs, thread):
     runnings = []
     finished = []
     for i in range(1, thread + 1):
+        time.sleep(0.1)
         runnings.append(pool.apply_async(runner, (i, configs.pop())))
     while len(finished) != len(configs):
-        time.sleep(30)
+        time.sleep(10)
         for res in runnings:
             if res.ready():
                 idx, cli = res.get()
                 finished.append(cli)
-                print(cli + " Finished")
+                print(str(idx) + ' ' + cli + ' Finished')
                 runnings.remove(res)
                 if len(configs) > 0:
                     runnings.append(pool.apply_async(runner, (idx, configs.pop())))
