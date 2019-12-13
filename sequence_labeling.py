@@ -62,7 +62,6 @@ def main():
         type=str,
         default='./dataset/syntic_data_yong/0-1000-10-new',
         help='location of the data corpus')
-    parser.add_argument('--epoch', type=int, default=50)
     parser.add_argument('--batch', type=int, default=20)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--momentum', type=float, default=0.9)
@@ -105,7 +104,6 @@ def main():
     random.seed(args.random_seed)
 
     log_dir = args.log_dir
-    epoch = args.epoch
     batch_size = args.batch
     lr = args.lr
     momentum = args.momentum
@@ -170,7 +168,9 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=lr)
     # depend on dev ppl
     best_epoch = (-1, 0.0, 0.0)
-    for i in range(epoch):
+    # util 6 epoch not update best_epoch
+    epoch = 0
+    while epoch - best_epoch[0] <= 6:
         epoch_loss = 0
         random.shuffle(train_dataset)
         model.train()
@@ -184,13 +184,14 @@ def main():
             optimizer.step()
             optimizer.zero_grad()
             epoch_loss += (loss.item()) * sentences.size(0)
-        logger.info('Epoch ' + str(i) + ' Loss: ' + str(round(epoch_loss / len(train_dataset), 4)))
+        logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / len(train_dataset), 4)))
         acc, corr = evaluate(dev_dataset, batch_size, model, device)
         logger.info('\t Dev Acc: ' + str(round(acc * 100, 3)))
         if best_epoch[1] < acc:
             test_acc, _ = evaluate(test_dataset, batch_size, model, device)
             logger.info('\t Test Acc: ' + str(round(test_acc * 100, 3)))
-            best_epoch = (i, acc, test_acc)
+            best_epoch = (epoch, acc, test_acc)
+        epoch += 1
 
     logger.info("Best Epoch: " + str(best_epoch[0]) + " Dev ACC: " + str(round(best_epoch[1] * 100, 3)) +
                 "Test ACC: " + str(round(best_epoch[2] * 100, 3)))
