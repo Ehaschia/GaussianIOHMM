@@ -241,7 +241,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         if output_cho_scale == 0:
             nn.init.uniform_(self.output_cho)
         else:
-            nn.init.constant_(self.output_cho, out_cho_scale)
+            nn.init.constant_(self.output_cho, output_cho_scale)
 
     #
     # This function is flip backward by sentence length

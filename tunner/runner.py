@@ -3,15 +3,24 @@ import paramiko
 import time
 from collections import deque
 import os
+
 THREAD = 18
-script_path = ''
-cli_prefix = ''
+script_path = '/public/home/tukewei/hanwj/zlw/GaussianIOHMM/scripts'
+cli_prefix = 'sh /public/home/tukewei/hanwj/zlw/GaussianIOHMM/scripts/'
+
 
 def runner(idx, cli):
     client = paramiko.SSHClient()
-    client.get_host_keys()
-    client.connect('node' + idx)
+    client.load_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
+    client.connect('node' + str(idx))
+    print(cli_prefix + cli)
     stdin, stdout, stderr = client.exec_command(cli_prefix + cli)
+    exit_status = stdout.channel.recv_exit_status()  # Blocking call
+    if exit_status == 0:
+        print('Task ' + cli + ' Done')
+    else:
+        print('Error ' + str(exit_status) + 'of ' + cli)
+    client.close()
     return idx, cli
 
 
@@ -20,7 +29,7 @@ def multiprocess(configs, thread):
     pool = Pool(processes=thread)
     runnings = []
     finished = []
-    for i in range(thread):
+    for i in range(1, thread + 1):
         runnings.append(pool.apply_async(runner, (i, configs.pop())))
     while len(finished) != len(configs):
         time.sleep(30)
@@ -39,4 +48,5 @@ def multiprocess(configs, thread):
 if __name__ == '__main__':
     # freeze_support()
     configs = deque(os.listdir(script_path))
+    print(len(configs))
     multiprocess(configs, THREAD)
