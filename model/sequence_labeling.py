@@ -229,7 +229,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         elif trans_cho_method == 'wishart':
             transition_var = invwishart.rvs(2*self.dim, np.eye(2*self.dim) / 2*self.dim,
                                             size=self.t_comp_num, random_state=None)
-            self.transition_cho.data = torch.from_numpy(np.linalg.cholesky(transition_var))
+            self.transition_cho.data = torch.from_numpy(np.linalg.cholesky(transition_var)).float()
         else:
             raise ValueError("Error transition init method")
         # output mu init
