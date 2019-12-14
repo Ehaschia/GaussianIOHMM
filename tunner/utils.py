@@ -13,11 +13,11 @@ ROOT_DIR = os.path.abspath(os.path.join(os.getcwd(), '..'))
 # load json
 def load_done_configs(name):
     output_dir = os.path.join(ROOT_DIR, name)
-    return filter(lambda x: os.path.exists(x + '/result.json'), os.listdir(output_dir))
+    return filter(lambda x: os.path.exists(output_dir + '/' + x + '/result.json'), os.listdir(output_dir))
 
 
 def param_json2list(json_file_name, keys):
-    with open(json_file_name, 'b') as f:
+    with open(json_file_name, 'r') as f:
         config = json.load(f)
     res = []
     for key in keys:
@@ -30,6 +30,6 @@ def load_configs(path):
     configs = []
     config_paths = os.listdir(path)
     for config_path in config_paths:
-        with open(config_path, 'r') as f:
-            configs.append((config_path, f.read()))
+        with open(path + '/' + config_path, 'r') as f:
+            configs.append((path + '/' + config_path, f.read()))
     return configs
