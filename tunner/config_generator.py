@@ -60,13 +60,13 @@ def configs_generate():
 def done_filter(root_path, generate_configs):
     done_configs = load_done_configs(root_path)
     for done_config in done_configs:
-        config_list = param_json2list(done_config, keys)
+        config_list = param_json2list(root_path + done_config, keys)
         generate_configs.remove(config_list)
     return generate_configs
 
 
-dfs([], 0)
+if __name__ == '__main__':
 
-generate_configs = done_filter(ROOT_DIR + '/output/', configs)
-
-configs_generate()
+    dfs([], 0)
+    generate_configs = done_filter(ROOT_DIR + '/output/', configs)
+    configs_generate()
