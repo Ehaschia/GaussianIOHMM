@@ -1,8 +1,7 @@
 import os
 from copy import copy
+from tunner.utils import ROOT_DIR, param_json2list, load_done_configs
 
-# Hyper setting
-ROOT_DIR = os.path.abspath(os.path.join(os.getcwd(), '..'))
 root = ROOT_DIR + '/scripts'
 if not os.path.exists(root):
     os.makedirs(root)
@@ -53,7 +52,16 @@ def configs_generate():
             f.write(config_generate(configs[idx]))
 
 
+def done_filter(root_path, generate_configs):
+    done_configs = load_done_configs(root_path)
+    for done_config in done_configs:
+        config_list = param_json2list(done_config, keys)
+        generate_configs.remove(config_list)
+    return generate_configs
+
+
 dfs([], 0)
 
-configs_generate()
+generate_configs = done_filter(ROOT_DIR + '/output/', configs)
 
+configs_generate()
