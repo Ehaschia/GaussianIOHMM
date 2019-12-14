@@ -7,7 +7,7 @@ from model.basic_operation import *
 
 class TestAtma(unittest.TestCase):
     def setUp(self) -> None:
-        self.mat = torch.Tensor([[1.0, 1.0], [0.0, 1.0]])
+        self.mat = torch.tensor([[1.0, 1.0], [0.0, 1.0]])
         self.batch_mat = self.mat.unsqueeze(0)
         self.result = [[1.0, 1.0], [1.0, 2.0]]
 

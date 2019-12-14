@@ -1,4 +1,3 @@
-# used for load sentence in a line
 def hmm_generate_data_loader(root, type='train'):
     name = {'train': 'train.txt',
             'dev': 'valid.txt',
