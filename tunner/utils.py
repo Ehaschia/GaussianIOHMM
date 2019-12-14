@@ -17,7 +17,7 @@ def load_done_configs(name):
 
 
 def param_json2list(json_file_name, keys):
-    with open(json_file_name, 'r') as f:
+    with open(json_file_name + '/param.json', 'r') as f:
         config = json.load(f)
     res = []
     for key in keys:
