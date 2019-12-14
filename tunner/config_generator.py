@@ -1,4 +1,9 @@
 import os
+import sys
+
+current_path = os.path.dirname(os.path.realpath(__file__))
+root_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(root_path)
 from copy import copy
 from tunner.utils import ROOT_DIR, param_json2list, load_done_configs
 

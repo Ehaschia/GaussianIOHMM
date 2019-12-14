@@ -1,8 +1,14 @@
+import os
+import sys
+
+current_path = os.path.dirname(os.path.realpath(__file__))
+root_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(root_path)
+
 from multiprocessing import Pool
 import paramiko
 import time
 from collections import deque
-import os
 
 THREAD = 18
 script_path = '/public/home/tukewei/hanwj/zlw/GaussianIOHMM/scripts'

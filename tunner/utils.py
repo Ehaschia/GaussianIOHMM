@@ -1,7 +1,10 @@
 import json
 import os
+import sys
 
-# from tunner.config_generator import json2list
+current_path = os.path.dirname(os.path.realpath(__file__))
+root_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(root_path)
 
 # Hyper setting
 ROOT_DIR = os.path.abspath(os.path.join(os.getcwd(), '..'))
