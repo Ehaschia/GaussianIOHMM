@@ -19,9 +19,9 @@ suffix = ''
 
 # parameters
 parameters = {
-    'data': ['./dataset/syntic_data_yong/0-1000-10-new', './dataset/syntic_data_yong/0-3000-10-new',
-             './dataset/syntic_data_yong/0-10000-10-new', './dataset/syntic_data_yong/0-30000-10-new',
-             './dataset/syntic_data_yong/0-10000-10-new'],
+    'data': ['./dataset/syntic_data_yong/0-1000-10-new',
+             './dataset/syntic_data_yong/0-10000-10-new',
+             './dataset/syntic_data_yong/0-100000-10-new'],
     'batch': ['8', '32', '128'],
     'dim': ['10'],
     'random_seed': ['1', '2', '3'],
@@ -51,7 +51,7 @@ def config_generate(config):
     return prefix + '\n' + python + ' ' + file + ' ' + ' '.join(config) + '\n' + suffix
 
 
-def configs_generate():
+def configs_generate(configs):
     for idx in range(len(configs)):
         with open(root + '/' + str(idx).zfill(len(str(len(configs)))) + '.sh', 'w') as f:
             f.write(config_generate(configs[idx]))
@@ -61,12 +61,13 @@ def done_filter(root_path, generate_configs):
     done_configs = load_done_configs(root_path)
     for done_config in done_configs:
         config_list = param_json2list(root_path + done_config, keys)
-        generate_configs.remove(config_list)
+        if config_list in generate_configs:
+            generate_configs.remove(config_list)
     return generate_configs
 
 
 if __name__ == '__main__':
 
     dfs([], 0)
-    generate_configs = done_filter(ROOT_DIR + '/output/', configs)
-    configs_generate()
+    configs = done_filter(ROOT_DIR + '/output/', configs)
+    configs_generate(configs)

@@ -22,7 +22,7 @@ for config_pair in configs:
 
 # load un-done file
 output_config_paths = os.listdir(output_dir)
-undone_config_paths = filter(lambda x: not os.path.exists(output_dir + x + 'result.json'),
+undone_config_paths = filter(lambda x: not os.path.exists(output_dir + x + '/result.json'),
                              output_config_paths)
 
 for undone_config_path in undone_config_paths:
