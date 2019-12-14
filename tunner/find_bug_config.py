@@ -30,4 +30,4 @@ for undone_config_path in undone_config_paths:
     if ' '.join(config) in cleaned_configs:
         print('='*20)
         print('Undone:\t' + undone_config_path)
-        print('Script:\t' + cleaned_configs[config])
+        print('Script:\t' + cleaned_configs[' '.join(config)])
