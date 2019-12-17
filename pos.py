@@ -218,7 +218,7 @@ def main():
                 sys.stdout.flush()
                 num_back = len(log_info)
 
-            logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / num_insts, 4)))
+        logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / num_insts, 4)))
         acc, corr = evaluate(dev_dataset, batch_size, model, device)
         logger.info('\t Dev Acc: ' + str(round(acc * 100, 3)))
         if best_epoch[1] < acc:
