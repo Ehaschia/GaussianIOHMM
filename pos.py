@@ -153,7 +153,8 @@ def main():
     test_path = os.path.join(root, 'test.conllu')
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = conllx_data.create_alphabets(alphabet_path,
                                                                                              train_path,
-                                                                                             data_paths=[dev_path, test_path],
+                                                                                             data_paths=[dev_path,
+                                                                                                         test_path],
                                                                                              embedd_dict=None,
                                                                                              max_vocabulary_size=1e5)
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
@@ -162,7 +163,8 @@ def main():
     ntokens = word_alphabet.size()
     nlabels = pos_alphabet.size()
 
-    train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
+    train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet,
+                                                   type_alphabet)
     num_data = sum(train_dataset[1])
     dev_dataset = conllx_data.read_data(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
     test_dataset = conllx_data.read_data(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
@@ -185,51 +187,64 @@ def main():
     # depend on dev ppl
     best_epoch = (-1, 0.0, 0.0)
     # util 6 epoch not update best_epoch
-    epoch = 0
     num_batches = num_data // batch_size + 1
-    while epoch - best_epoch[0] <= 6:
-        epoch_loss = 0
-        num_back = 0
-        num_words = 0
-        num_insts = 0
-        model.train()
-        for step, data in enumerate(
-                iterate_data(train_dataset, batch_size, bucketed=True, unk_replace=unk_replace, shuffle=True)):
-            # for j in tqdm(range(math.ceil(len(train_dataset) / batch_size))):
-            optimizer.zero_grad()
-            # samples = train_dataset[j * batch_size: (j + 1) * batch_size]
-            words, labels, masks = data['WORD'].to(device), data['POS'].to(device), data['MASK'].to(device)
 
-            # sentences, labels, masks, revert_order = standardize_batch(samples)
-            loss = model.get_loss(words, labels, masks)
-            loss.backward()
-            optimizer.step()
-            epoch_loss += (loss.item()) * words.size(0)
-            num_words += torch.sum(masks).item()
-            num_insts += words.size()[0]
-            if step % 10 == 0:
-                torch.cuda.empty_cache()
-                sys.stdout.write("\b" * num_back)
-                sys.stdout.write(" " * num_back)
-                sys.stdout.write("\b" * num_back)
-                log_info = '[%d/%d (%.0f%%) lr=%.6f] loss: %.4f (%.4f)' % (step, num_batches, 100. * step / num_batches,
-                                                                           lr, epoch_loss / num_insts, epoch_loss / num_words)
-                sys.stdout.write(log_info)
-                sys.stdout.flush()
-                num_back = len(log_info)
+    def train(best_epoch):
+        epoch = 0
+        while epoch - best_epoch[0] <= 6:
+            epoch_loss = 0
+            num_back = 0
+            num_words = 0
+            num_insts = 0
+            model.train()
+            for step, data in enumerate(
+                    iterate_data(train_dataset, batch_size, bucketed=True, unk_replace=unk_replace, shuffle=True)):
+                # for j in tqdm(range(math.ceil(len(train_dataset) / batch_size))):
+                optimizer.zero_grad()
+                # samples = train_dataset[j * batch_size: (j + 1) * batch_size]
+                words, labels, masks = data['WORD'].to(device), data['POS'].to(device), data['MASK'].to(device)
 
-        logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / num_insts, 4)))
-        acc, corr = evaluate(dev_dataset, batch_size, model, device)
-        logger.info('\t Dev Acc: ' + str(round(acc * 100, 3)))
-        if best_epoch[1] < acc:
-            test_acc, _ = evaluate(test_dataset, batch_size, model, device)
-            logger.info('\t Test Acc: ' + str(round(test_acc * 100, 3)))
-            best_epoch = (epoch, acc, test_acc)
-        epoch += 1
+                # sentences, labels, masks, revert_order = standardize_batch(samples)
+                loss = model.get_loss(words, labels, masks)
+                loss.backward()
+                optimizer.step()
+                epoch_loss += (loss.item()) * words.size(0)
+                num_words += torch.sum(masks).item()
+                num_insts += words.size()[0]
+                if step % 10 == 0:
+                    torch.cuda.empty_cache()
+                    sys.stdout.write("\b" * num_back)
+                    sys.stdout.write(" " * num_back)
+                    sys.stdout.write("\b" * num_back)
+                    log_info = '[%d/%d (%.0f%%) lr=%.6f] loss: %.4f (%.4f)' % (
+                    step, num_batches, 100. * step / num_batches,
+                    lr, epoch_loss / num_insts, epoch_loss / num_words)
+                    sys.stdout.write(log_info)
+                    sys.stdout.flush()
+                    num_back = len(log_info)
 
-    logger.info("Best Epoch: " + str(best_epoch[0]) + " Dev ACC: " + str(round(best_epoch[1] * 100, 3)) +
-                "Test ACC: " + str(round(best_epoch[2] * 100, 3)))
+            logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / num_insts, 4)))
+            acc, corr = evaluate(dev_dataset, batch_size, model, device)
+            logger.info('\t Dev Acc: ' + str(round(acc * 100, 3)))
+            if best_epoch[1] < acc:
+                test_acc, _ = evaluate(test_dataset, batch_size, model, device)
+                logger.info('\t Test Acc: ' + str(round(test_acc * 100, 3)))
+                best_epoch = (epoch, acc, test_acc)
+            epoch += 1
 
+        logger.info("Best Epoch: " + str(best_epoch[0]) + " Dev ACC: " + str(round(best_epoch[1] * 100, 3)) +
+                    "Test ACC: " + str(round(best_epoch[2] * 100, 3)))
+        return best_epoch
+
+    best_epoch = train(best_epoch)
+    # logger.info("After tunning mu. Here we tunning variance")
+    # # flip gradient
+    #
+    # for parameter in model.parameters():
+    #     # flip
+    #     parameter.requires_grad = not parameter.requires_grad
+    
+    best_epoch = train(best_epoch)
     with open(log_dir + '/' + 'result.json', 'w') as f:
         final_result = {"Epoch": best_epoch[0],
                         "Dev": best_epoch[1] * 100,

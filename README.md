@@ -8,5 +8,6 @@
     * clean code
 * Implement NER part
 * Implement new train strategy: first training mu. Then update variance
+    * it seems work. Need to investigate the best strategy. 
 * Investigate the benefit of our graph model. (Like known several truth label)
 * Investigate how to express interpretability.
