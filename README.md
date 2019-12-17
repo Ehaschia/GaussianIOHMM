@@ -11,3 +11,10 @@
     * it seems work. Need to investigate the best strategy. 
 * Investigate the benefit of our graph model. (Like known several truth label)
 * Investigate how to express interpretability.
+* Implement IOHMM
+
+
+Next week (12/17-12/24) need to do:
+* Implement IOHMM
+* fix grid search tunner bug
+* mixture gaussian unit test
