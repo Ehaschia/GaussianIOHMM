@@ -204,13 +204,13 @@ def main():
 
     best_epoch = train(best_epoch, thread=6)
 
-    # logger.info("After tunning var. Here we tunning mu")
-    #
-    # for parameter in model.parameters():
-    #     # flip
-    #     parameter.requires_grad = not parameter.requires_grad
-    #
-    # best_epoch = train(best_epoch)
+    logger.info("After tunning var. Here we tunning mu")
+
+    for parameter in model.parameters():
+        # flip
+        parameter.requires_grad = not parameter.requires_grad
+
+    best_epoch = train(best_epoch)
 
 
     with open(log_dir + '/' + 'result.json', 'w') as f:

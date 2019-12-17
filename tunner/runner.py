@@ -10,23 +10,28 @@ import paramiko
 import time
 from collections import deque
 
-THREAD = 18
+THREAD = 17
 script_path = '/public/home/tukewei/hanwj/zlw/GaussianIOHMM/scripts'
 cli_prefix = 'sh /public/home/tukewei/hanwj/zlw/GaussianIOHMM/scripts/'
+skip = {17}
 
 
 def runner(idx, cli):
     client = paramiko.SSHClient()
     client.load_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
+    print("Begin to connect " + str(idx))
     client.connect('node' + str(idx))
-    print(cli_prefix + cli)
+    print("Connected " + str(idx))
     stdin, stdout, stderr = client.exec_command(cli_prefix + cli)
+    print("Run " + cli + " on " + str(idx))
     exit_status = stdout.channel.recv_exit_status()  # Blocking call
+    print("Finish " + cli + " on " + str(idx))
     if exit_status == 0:
         print('Task ' + cli + ' Done at Thread ' + str(idx))
     else:
         print('Error ' + str(exit_status) + 'of ' + cli + ' at Thread ' + str(idx))
     client.close()
+    print("Close " + str(idx))
     return idx, cli
 
 
@@ -36,8 +41,10 @@ def multiprocess(configs, thread):
     runnings = {}
     finished = []
     # init threads
-    for i in range(1, thread + 1):
-        time.sleep(0.1)
+    for i in range(1, thread + 1 + len(skip)):
+        time.sleep(1)
+        if i in skip:
+            continue
         runnings[i] = pool.apply_async(runner, (i, configs.pop()))
 
     while len(finished) != len(configs):
@@ -55,7 +62,6 @@ def multiprocess(configs, thread):
                         runnings[idx] = pool.apply_async(runner, (idx, configs.pop()))
             else:
                 pass
-        print("Activate thread: " + str(activate_thread))
 
 
 if __name__ == '__main__':
