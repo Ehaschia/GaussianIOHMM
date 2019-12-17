@@ -1,5 +1,11 @@
-import json
 import os
+import sys
+
+current_path = os.path.dirname(os.path.realpath(__file__))
+root_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(root_path)
+
+import json
 from tunner.utils import ROOT_DIR
 import csv
 

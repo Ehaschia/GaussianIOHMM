@@ -167,33 +167,51 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=lr)
     # depend on dev ppl
     best_epoch = (-1, 0.0, 0.0)
+
     # util 6 epoch not update best_epoch
-    epoch = 0
-    while epoch - best_epoch[0] <= 6:
-        epoch_loss = 0
-        random.shuffle(train_dataset)
-        model.train()
-        optimizer.zero_grad()
-        for j in tqdm(range(math.ceil(len(train_dataset) / batch_size))):
-            samples = train_dataset[j * batch_size: (j + 1) * batch_size]
-
-            sentences, labels, masks, revert_order = standardize_batch(samples)
-            loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device))
-            loss.backward()
-            optimizer.step()
+    def train(best_epoch, thread=6):
+        epoch = 0
+        while epoch - best_epoch[0] <= thread:
+            epoch_loss = 0
+            random.shuffle(train_dataset)
+            model.train()
             optimizer.zero_grad()
-            epoch_loss += (loss.item()) * sentences.size(0)
-        logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / len(train_dataset), 4)))
-        acc, corr = evaluate(dev_dataset, batch_size, model, device)
-        logger.info('\t Dev Acc: ' + str(round(acc * 100, 3)))
-        if best_epoch[1] < acc:
-            test_acc, _ = evaluate(test_dataset, batch_size, model, device)
-            logger.info('\t Test Acc: ' + str(round(test_acc * 100, 3)))
-            best_epoch = (epoch, acc, test_acc)
-        epoch += 1
+            for j in tqdm(range(math.ceil(len(train_dataset) / batch_size))):
+                samples = train_dataset[j * batch_size: (j + 1) * batch_size]
 
-    logger.info("Best Epoch: " + str(best_epoch[0]) + " Dev ACC: " + str(round(best_epoch[1] * 100, 3)) +
-                "Test ACC: " + str(round(best_epoch[2] * 100, 3)))
+                sentences, labels, masks, revert_order = standardize_batch(samples)
+                loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device))
+                loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
+                epoch_loss += (loss.item()) * sentences.size(0)
+            logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / len(train_dataset), 4)))
+            acc, corr = evaluate(dev_dataset, batch_size, model, device)
+            logger.info('\t Dev Acc: ' + str(round(acc * 100, 3)))
+            if best_epoch[1] < acc:
+                test_acc, _ = evaluate(test_dataset, batch_size, model, device)
+                logger.info('\t Test Acc: ' + str(round(test_acc * 100, 3)))
+                best_epoch = (epoch, acc, test_acc)
+            epoch += 1
+
+        logger.info("Best Epoch: " + str(best_epoch[0]) + " Dev ACC: " + str(round(best_epoch[1] * 100, 3)) +
+                    "Test ACC: " + str(round(best_epoch[2] * 100, 3)))
+        return best_epoch
+
+    # for parameter in model.parameters():
+    #     # flip
+    #     parameter.requires_grad = not parameter.requires_grad
+
+    best_epoch = train(best_epoch, thread=6)
+
+    # logger.info("After tunning var. Here we tunning mu")
+    #
+    # for parameter in model.parameters():
+    #     # flip
+    #     parameter.requires_grad = not parameter.requires_grad
+    #
+    # best_epoch = train(best_epoch)
+
 
     with open(log_dir + '/' + 'result.json', 'w') as f:
         final_result = {"Epoch": best_epoch[0],
