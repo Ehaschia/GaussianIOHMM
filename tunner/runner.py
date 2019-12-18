@@ -10,10 +10,12 @@ import paramiko
 import time
 from collections import deque
 
-THREAD = 17
-script_path = '/public/home/tukewei/hanwj/zlw/GaussianIOHMM/scripts'
-cli_prefix = 'sh /public/home/tukewei/hanwj/zlw/GaussianIOHMM/scripts/'
-skip = {17}
+from tunner.utils import ROOT_DIR
+
+THREAD = 18
+script_path = ROOT_DIR + '/scripts/'
+cli_prefix = 'sh ' + script_path
+skip = {}
 
 
 def runner(idx, cli):
@@ -24,14 +26,24 @@ def runner(idx, cli):
     print("Connected " + str(idx))
     stdin, stdout, stderr = client.exec_command(cli_prefix + cli)
     print("Run " + cli + " on " + str(idx))
-    exit_status = stdout.channel.recv_exit_status()  # Blocking call
+    # detect done or not
+    while True:
+        time.sleep(60)
+        detector = paramiko.SSHClient()
+        detector.load_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
+        print("Begin to detect " + str(idx))
+        detector.connect('node' + str(idx))
+        stdin, stdout, stderr = detector.exec_command('top -bn1 | grep hanwj')
+        tmp = stdout.read().decode()
+        detector.close()
+
+        if tmp.find('python') != -1:
+            pass
+        else:
+            # print(stdout.read().decode())
+            client.close()
+            break
     print("Finish " + cli + " on " + str(idx))
-    if exit_status == 0:
-        print('Task ' + cli + ' Done at Thread ' + str(idx))
-    else:
-        print('Error ' + str(exit_status) + 'of ' + cli + ' at Thread ' + str(idx))
-    client.close()
-    print("Close " + str(idx))
     return idx, cli
 
 
@@ -42,17 +54,15 @@ def multiprocess(configs, thread):
     finished = []
     # init threads
     for i in range(1, thread + 1 + len(skip)):
-        time.sleep(1)
+        time.sleep(3)
         if i in skip:
             continue
         runnings[i] = pool.apply_async(runner, (i, configs.pop()))
 
     while len(finished) != len(configs):
-        time.sleep(10)
-        activate_thread = 0
+        time.sleep(60)
         for idx in runnings.keys():
             if runnings[idx] is not None:
-                activate_thread += 1
                 if runnings[idx].ready():
                     finished_thread = runnings[idx]
                     runnings[idx] = None
