@@ -1,4 +1,5 @@
-/output/
-/.idea/
-/venv/
+./output/
+./.idea/
+./venv/
 model.pt
+./dataset

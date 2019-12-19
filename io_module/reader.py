@@ -142,7 +142,7 @@ class CoNLL03Reader(object):
         for tokens in lines:
             chars = []
             char_ids = []
-            for char in tokens[1]:
+            for char in tokens[0]:
                 chars.append(char)
                 char_ids.append(self.__char_alphabet.get_index(char))
             if len(chars) > MAX_CHAR_LENGTH:
@@ -151,10 +151,10 @@ class CoNLL03Reader(object):
             char_seqs.append(chars)
             char_id_seqs.append(char_ids)
 
-            word = DIGIT_RE.sub("0", tokens[1]) if normalize_digits else tokens[1]
-            pos = tokens[2]
-            chunk = tokens[3]
-            ner = tokens[4]
+            word = DIGIT_RE.sub("0", tokens[0]) if normalize_digits else tokens[0]
+            pos = tokens[1]
+            chunk = tokens[2]
+            ner = tokens[3]
 
             words.append(word)
             word_ids.append(self.__word_alphabet.get_index(word))
