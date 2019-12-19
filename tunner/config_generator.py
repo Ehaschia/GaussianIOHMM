@@ -6,16 +6,17 @@ root_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(root_path)
 from copy import copy
 from tunner.utils import ROOT_DIR, param_json2list, load_done_configs
+import random
 
 root = ROOT_DIR + '/scripts'
 if not os.path.exists(root):
     os.makedirs(root)
-
-prefix = '#!/usr/bin/env bash\n' \
-         'cd ' + ROOT_DIR + '\n'
+bash_prefix = '#!/usr/bin/env bash\n'
+cd_prefix = 'cd ' + ROOT_DIR + '\n'
 python = '/public/home/tukewei/hanwj/edus/anaconda2/envs/iohmm/bin/python'
 file = 'sequence_labeling.py'
 suffix = ''
+node_num = 18
 
 # parameters
 parameters = {
@@ -29,12 +30,17 @@ parameters = {
     't_mu_drop': ['0.0', '0.2', '0.5'],
     'out_mu_drop': ['0.0', '0.2', '0.5'],
     'trans_cho_method': ['random', 'wishart'],
-    'input_cho_init': ['0.0', '1.0'],
-    'output_cho_init': ['0.0', '1.0'],
+    'input_cho_init': ['0.0'],
+    'output_cho_init': ['0.0'],
 }
 
 keys = list(parameters.keys())
 configs = []
+
+
+def generate_qbs_prefix(idx):
+    return '# PBS -N ' + str(idx) + '.out\n# PBS -l nodes=node' + str(idx % node_num + 1) + \
+           ':ppn=1\n# PBS -q batch\n# PBS -j oe\n# PBS -l walltime=1000:00:00\n'
 
 
 def dfs(config, idx):
@@ -47,14 +53,19 @@ def dfs(config, idx):
             dfs(new_config, idx + 1)
 
 
-def config_generate(config):
-    return prefix + '\n' + python + ' ' + file + ' ' + ' '.join(config) + '\n' + suffix
+def config_generate(config, idx):
+    return cd_prefix + '\n' + python + ' ' + file + ' ' + ' '.join(config) + '\n' + suffix
 
 
-def configs_generate(configs):
+def configs_generate(configs, func):
     for idx in range(len(configs)):
         with open(root + '/' + str(idx).zfill(len(str(len(configs)))) + '.sh', 'w') as f:
-            f.write(config_generate(configs[idx]))
+            f.write(bash_prefix)
+            f.write(func(configs[idx], idx))
+
+
+def pbs_config_generate(config, idx):
+    return generate_qbs_prefix(idx) + config_generate(config, idx)
 
 
 def done_filter(root_path, generate_configs):
@@ -67,7 +78,6 @@ def done_filter(root_path, generate_configs):
 
 
 if __name__ == '__main__':
-
     dfs([], 0)
     configs = done_filter(ROOT_DIR + '/output/', configs)
-    configs_generate(configs)
+    configs_generate(configs, pbs_config_generate)
