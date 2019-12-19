@@ -34,15 +34,24 @@ def runner(idx, cli):
         print("Begin to detect " + str(idx))
         detector.connect('node' + str(idx))
         stdin, stdout, stderr = detector.exec_command('top -bn1 | grep hanwj')
-        tmp = stdout.read().decode()
+        programs = stdout.read().decode().strip().split('\n')
         detector.close()
+        # find python
+        python_line = None
+        for line in programs:
+            if line.find('python') != -1:
+                python_line = line
 
-        if tmp.find('python') != -1:
-            pass
-        else:
-            # print(stdout.read().decode())
+        # if not python line
+        if python_line is None:
             client.close()
             break
+        else:
+            cpu = float([line for line in python_line.split(' ') if len(line) > 0][8])
+            if cpu < 100.0:
+                client.close()
+                break
+
     print("Finish " + cli + " on " + str(idx))
     return idx, cli
 
