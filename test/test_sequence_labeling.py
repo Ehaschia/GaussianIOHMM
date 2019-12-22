@@ -4,7 +4,7 @@ from model import basic_operation
 import torch
 
 
-class TestMixtureGaussianSequenceLabeling(unittest.TestCase):
+class TestOneComponentGaussianSequenceLabeling(unittest.TestCase):
 
     def setUp(self) -> None:
         # here I test the expected count is same
@@ -134,7 +134,6 @@ class TestMixtureGaussianSequenceLabeling(unittest.TestCase):
         pos2_label2, _, _ = basic_operation.gaussian_multi(self.out2_mu, exp2_mu,
                                                            self.out2_var, exp2_var, need_zeta=True)
 
-
         real_pos1_label1 = pos1_label1.item() + exp1_score.item() + forward1_score.item() + part1_score.item() + part1b_score.item() + backward2_score.item() + part2b_score.item()
         real_pos1_label2 = pos1_label2.item() + exp1_score.item() + forward1_score.item() + part1_score.item() + part1b_score.item() + backward2_score.item() + part2b_score.item()
         real_pos2_label1 = pos2_label1.item() + exp2_score.item() + forward2_score.item() + part2_score.item() + forward1_score.item() + part1_score.item() + part2b_score.item()
@@ -144,6 +143,3 @@ class TestMixtureGaussianSequenceLabeling(unittest.TestCase):
         self.assertAlmostEqual(model_score[0, 1], real_pos1_label2, 5)
         self.assertAlmostEqual(model_score[1, 0], real_pos2_label1, 5)
         self.assertAlmostEqual(model_score[1, 1], real_pos2_label2, 5)
-        
-
-
