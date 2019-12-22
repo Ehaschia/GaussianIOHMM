@@ -243,6 +243,15 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         else:
             nn.init.constant_(self.output_cho, output_cho_scale)
 
+    # just used for unit test
+    def inject_parameter(self, in_mu, in_cho, tran_mu, tran_cho, out_mu, out_cho):
+        self.input_mu_embedding.weight.data = in_mu
+        self.input_cho_embedding.weight.data = in_cho
+        self.transition_mu.data = tran_mu
+        self.transition_cho.data = tran_cho
+        self.output_mu.data = out_mu
+        self.output_cho.data = out_cho
+
     #
     # This function is flip backward by sentence length
     # def forward(self, sentences: torch.Tensor, backward_order: torch.Tensor) -> torch.Tensor:
@@ -488,13 +497,10 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         backward_prev_var = init_var
 
         part_score, part_mu, part_var = gaussian_multi_integral(trans_mu, backward_prev_mu, trans_var,
-                                                                backward_prev_var, need_zeta=True, forward=True)
+                                                                backward_prev_var, need_zeta=True, forward=False)
         backward_prev_score, backward_prev_mu, backward_prev_var = gaussian_top_k_pruning(part_score.view(batch, -1),
-                                                                                          part_mu.view(batch, -1,
-                                                                                                       self.dim),
-                                                                                          part_var.view(batch, -1,
-                                                                                                        self.dim,
-                                                                                                        self.dim),
+                                                                                          part_mu.view(batch, -1, self.dim),
+                                                                                          part_var.view(batch, -1, self.dim, self.dim),
                                                                                           k=self.max_comp)
 
         backward_holder_score = [backward_prev_score]
@@ -524,7 +530,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
                                                                     trans_var.view(1, 1, self.t_comp_num, 2 * self.dim,
                                                                                    2 * self.dim),
                                                                     backward_var.view(batch, -1, 1, self.dim, self.dim),
-                                                                    need_zeta=True, forward=True)
+                                                                    need_zeta=True, forward=False)
 
             real_backward_score = (backward_score + backward_prev_score.view(batch, -1, 1)).reshape(batch, -1, 1) + \
                                   part_score
