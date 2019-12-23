@@ -136,16 +136,16 @@ def gaussian_multi_integral(mu0: torch.Tensor, mu1: torch.Tensor,
 # If current component less than max component, we full it with normal gaussian
 def gaussian_top_k_pruning(score, mu, var, k=1):
     batch, _, dim = mu.size()
-    device = score.device()
+    device = score.device
     if score.size()[-1] == k:
         return score, mu, var
     elif score.size()[-1] < k:
         gap = k - score.size()[-1]
         gap_score = (torch.min(score).detach() - 1e6).expand(batch, gap).to(device)
         gap_mu = torch.zeros(batch, gap, dim).to(device)
-        gap_var = torch.zeros(batch, gap, dim, dim).to(device)
+        gap_var = torch.eye(dim).repeat(batch, gap, 1, 1).to(device)
         return torch.cat([score, gap_score], dim=1), torch.cat([mu, gap_mu], dim=1), torch.cat([var, gap_var], dim=1)
     pruned_score, index = torch.topk(score, k, dim=-1)
-    pruned_mu = torch.gather(mu, 1, index.view(batch, 1, 1).expand(batch, 1, dim))
-    pruned_var = torch.gather(var, 1, index.view(batch, 1, 1, 1).repeat(1, 1, dim, dim))
+    pruned_mu = torch.gather(mu, 1, index.view(batch, -1, 1).repeat(1, 1, dim))
+    pruned_var = torch.gather(var, 1, index.view(batch, -1, 1, 1).repeat(1, 1, dim, dim))
     return pruned_score, pruned_mu, pruned_var

@@ -433,7 +433,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
         # name reuse, ugly. Need to approve
         output_mu = self.output_mu_dropout(self.output_mu)
-        output_var = torch.diag_embed(self.output_cho_dropout(self.output_cho) ** 2).float().reshape(self.nlabels, self.o_comp_num, self.dim, self.dim)
+        output_var = torch.diag_embed(self.output_cho_dropout(self.output_cho).reshape(self.nlabels, self.o_comp_num, self.dim) ** 2).float()
 
         trans_mu = self.trans_mu_dropout(self.transition_mu).reshape(1, 1, self.t_comp_num, 2 * self.dim)
         trans_var = atma(self.trans_cho_dropout(self.transition_cho)).reshape(1, 1, self.t_comp_num, 2 * self.dim, 2 * self.dim)
