@@ -17,5 +17,13 @@
 
 Next week (12/17-12/24) need to do:
 * Implement IOHMM
-* fix grid search tunner bug
-* mixture gaussian unit test
+* ~~fix grid search tunner bug~~
+* ~~mixture gaussian unit test~~
+
+### Issue
+
+The current issue under issue dictionary
+
+*   sequence labeling forward issue: 
+
+    Before fixing, we used `forward=True` in `gaussian_multiply_integral` function during backward.
