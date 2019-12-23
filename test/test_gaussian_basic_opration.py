@@ -1,6 +1,7 @@
 import unittest
 
 import math
+import copy
 
 from model.basic_operation import *
 
@@ -62,11 +63,43 @@ class TestGaussianMultiIntegral(unittest.TestCase):
 
     def test_one_dim_forward(self):
         score, mu, sigma = gaussian_multi_integral(self.mu1, self.mu0, self.sigma1, self.sigma0, forward=True)
-        lam = np.array([[4.0 / 3.0, -2.0 / 3.0], [-2.0 / 3.0, 4.0 / 3.0]])
-        lam[0][0] += 0.5
-        golden_sigma = np.linalg.inv(lam)[1][1]
-        self.assertAlmostEqual(golden_sigma, sigma.item())
+        # lam = np.array([[4.0 / 3.0, -2.0 / 3.0], [-2.0 / 3.0, 4.0 / 3.0]])
+        lam1 = np.linalg.inv(self.sigma1.detach().numpy())
+        lam = copy.copy(lam1)
+        lam[0][0] += 1.0 / self.sigma0.item()
+        golden_sigma = np.linalg.inv(lam)
+        self.assertAlmostEqual(golden_sigma[1][1], sigma.item())
+        eta0 = 1.0 / self.sigma0.item() * self.mu0.item()
+        eta1 = lam1.dot(self.mu1.detach().numpy())
+        eta = copy.copy(eta1)
+        eta[0] += eta0
+        golden_mu = golden_sigma.dot(eta)
+        self.assertAlmostEqual(golden_mu[1], mu.item())
+        zeta0 = -0.5 * (math.log(2 * math.pi) - np.log(1.0 / self.sigma0.item()) + eta0 * self.sigma0.item() * eta0)
+        zeta1 = -0.5 * (2 * math.log(2 * math.pi) - np.log(np.linalg.det(lam1)) + eta1.dot(self.sigma1.detach().numpy().dot(eta1)))
+        zeta = -0.5 * (2 * math.log(2 * math.pi) - np.log(np.linalg.det(lam)) + eta.dot(golden_sigma.dot(eta)))
+        golden_score = zeta0 + zeta1 - zeta
+        self.assertAlmostEqual(golden_score, score.item(), 6)
 
+    def test_one_dim_backward(self):
+        score, mu, sigma = gaussian_multi_integral(self.mu1, self.mu0, self.sigma1, self.sigma0, forward=False)
+        lam1 = np.linalg.inv(self.sigma1.detach().numpy())
+        lam = copy.copy(lam1)
+        lam[1][1] += 1.0 / self.sigma0.item()
+        golden_sigma = np.linalg.inv(lam)
+        self.assertAlmostEqual(golden_sigma[0][0], sigma.item(), 6)
+        eta0 = 1.0 / self.sigma0.item() * self.mu0.item()
+        eta1 = lam1.dot(self.mu1.detach().numpy())
+        eta = copy.copy(eta1)
+        eta[1] += eta0
+        golden_mu = golden_sigma.dot(eta)
+        self.assertAlmostEqual(golden_mu[0], mu.item(), 6)
+        zeta0 = -0.5 * (math.log(2 * math.pi) - np.log(1.0 / self.sigma0.item()) + eta0 * self.sigma0.item() * eta0)
+        zeta1 = -0.5 * (2 * math.log(2 * math.pi) - np.log(np.linalg.det(lam1)) + eta1.dot(
+            self.sigma1.detach().numpy().dot(eta1)))
+        zeta = -0.5 * (2 * math.log(2 * math.pi) - np.log(np.linalg.det(lam)) + eta.dot(golden_sigma.dot(eta)))
+        golden_score = zeta0 + zeta1 - zeta
+        self.assertAlmostEqual(golden_score, score.item(), 6)
 
 if __name__ == '__main__':
     unittest.main()
