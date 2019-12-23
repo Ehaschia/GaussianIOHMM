@@ -168,8 +168,9 @@ def main():
     # depend on dev ppl
     best_epoch = (-1, 0.0, 0.0)
 
-    # util 6 epoch not update best_epoch
-    def train(best_epoch, thread=6):
+    # Default: util 6 epoch not update best_epoch
+    # If aim_epoch is not 0. It will train aim_epoch times.
+    def train(best_epoch, thread=6, aim_epoch=0):
         epoch = 0
         while epoch - best_epoch[0] <= thread:
             epoch_loss = 0
@@ -194,6 +195,9 @@ def main():
                 best_epoch = (epoch, acc, test_acc)
             epoch += 1
 
+            if aim_epoch != 0 and epoch >= aim_epoch:
+                break
+
         logger.info("Best Epoch: " + str(best_epoch[0]) + " Dev ACC: " + str(round(best_epoch[1] * 100, 3)) +
                     "Test ACC: " + str(round(best_epoch[2] * 100, 3)))
         return best_epoch
@@ -211,7 +215,6 @@ def main():
         parameter.requires_grad = not parameter.requires_grad
 
     best_epoch = train(best_epoch)
-
 
     with open(log_dir + '/' + 'result.json', 'w') as f:
         final_result = {"Epoch": best_epoch[0],
