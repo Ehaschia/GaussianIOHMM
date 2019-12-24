@@ -1,0 +1,286 @@
+2019-12-23 18:01:10,997 - Sequence-Labeling - INFO - Namespace(batch=20, data='./dataset/syntic_data_yong/0-1000-10-new', dim=10, gpu=False, in_cho_drop=0.0, in_mu_drop=0.0, input_cho_init=0.0, input_comp_num=1, log_dir='./output/2019-12-23_180110/', lr=0.001, max_comp=1, momentum=0.9, out_cho_drop=0.0, out_mu_drop=0.0, output_cho_init=0.0, output_comp_num=1, random_seed=10, t_cho_drop=0.0, t_mu_drop=0.0, tran_comp_num=1, trans_cho_init=1.0, trans_cho_method='random', var_scale=1.0)
+2019-12-23 18:01:10,997 - Sequence-Labeling - INFO - Parameter From global_variables.py
+2019-12-23 18:01:10,997 - Sequence-Labeling - INFO - LOG_PATH:./output/2019-12-23_180110/
+2019-12-23 18:01:10,997 - Sequence-Labeling - INFO - EMISSION_CHO_GRAD:False
+2019-12-23 18:01:10,997 - Sequence-Labeling - INFO - TRANSITION_CHO_GRAD:False
+2019-12-23 18:01:10,997 - Sequence-Labeling - INFO - DECODE_CHO_GRAD:False
+2019-12-23 18:01:10,997 - Sequence-Labeling - INFO - FAR_TRANSITION_MU:False
+2019-12-23 18:01:10,997 - Sequence-Labeling - INFO - FAR_DECODE_MU:False
+2019-12-23 18:01:10,999 - Sequence-Labeling - INFO - FAR_EMISSION_MU:False
+2019-12-23 18:01:10,999 - Sequence-Labeling - INFO - RANDOM_SEED:10
+2019-12-23 18:01:10,999 - Sequence-Labeling - INFO - Load data....
+2019-12-23 18:01:11,007 - Sequence-Labeling - INFO - Building model MixtureGaussianSequenceLabeling...
+2019-12-23 18:01:22,262 - Sequence-Labeling - INFO - Epoch 0 Loss: 2965573.0829
+2019-12-23 18:01:22,674 - Sequence-Labeling - INFO - 	 Dev Acc: 29.556
+2019-12-23 18:01:22,929 - Sequence-Labeling - INFO - 	 Test Acc: 30.429
+2019-12-23 18:01:34,097 - Sequence-Labeling - INFO - Epoch 1 Loss: 35.6639
+2019-12-23 18:01:34,608 - Sequence-Labeling - INFO - 	 Dev Acc: 31.444
+2019-12-23 18:01:34,898 - Sequence-Labeling - INFO - 	 Test Acc: 32.143
+2019-12-23 18:01:46,045 - Sequence-Labeling - INFO - Epoch 2 Loss: 29.9096
+2019-12-23 18:01:46,457 - Sequence-Labeling - INFO - 	 Dev Acc: 34.222
+2019-12-23 18:01:46,711 - Sequence-Labeling - INFO - 	 Test Acc: 34.286
+2019-12-23 18:01:57,944 - Sequence-Labeling - INFO - Epoch 3 Loss: 26.1603
+2019-12-23 18:01:58,363 - Sequence-Labeling - INFO - 	 Dev Acc: 36.667
+2019-12-23 18:01:58,628 - Sequence-Labeling - INFO - 	 Test Acc: 38.0
+2019-12-23 18:02:10,185 - Sequence-Labeling - INFO - Epoch 4 Loss: 23.5655
+2019-12-23 18:02:10,626 - Sequence-Labeling - INFO - 	 Dev Acc: 40.0
+2019-12-23 18:02:10,886 - Sequence-Labeling - INFO - 	 Test Acc: 40.714
+2019-12-23 18:02:22,428 - Sequence-Labeling - INFO - Epoch 5 Loss: 21.531
+2019-12-23 18:02:22,925 - Sequence-Labeling - INFO - 	 Dev Acc: 42.0
+2019-12-23 18:02:23,179 - Sequence-Labeling - INFO - 	 Test Acc: 43.0
+2019-12-23 18:02:34,717 - Sequence-Labeling - INFO - Epoch 6 Loss: 19.9793
+2019-12-23 18:02:35,151 - Sequence-Labeling - INFO - 	 Dev Acc: 44.111
+2019-12-23 18:02:35,408 - Sequence-Labeling - INFO - 	 Test Acc: 44.714
+2019-12-23 18:02:46,857 - Sequence-Labeling - INFO - Epoch 7 Loss: 18.7091
+2019-12-23 18:02:47,313 - Sequence-Labeling - INFO - 	 Dev Acc: 45.444
+2019-12-23 18:02:47,570 - Sequence-Labeling - INFO - 	 Test Acc: 47.286
+2019-12-23 18:02:59,512 - Sequence-Labeling - INFO - Epoch 8 Loss: 17.6043
+2019-12-23 18:02:59,923 - Sequence-Labeling - INFO - 	 Dev Acc: 47.222
+2019-12-23 18:03:00,190 - Sequence-Labeling - INFO - 	 Test Acc: 49.571
+2019-12-23 18:03:11,760 - Sequence-Labeling - INFO - Epoch 9 Loss: 16.6337
+2019-12-23 18:03:12,169 - Sequence-Labeling - INFO - 	 Dev Acc: 48.0
+2019-12-23 18:03:12,448 - Sequence-Labeling - INFO - 	 Test Acc: 51.0
+2019-12-23 18:03:23,870 - Sequence-Labeling - INFO - Epoch 10 Loss: 15.7978
+2019-12-23 18:03:24,281 - Sequence-Labeling - INFO - 	 Dev Acc: 49.111
+2019-12-23 18:03:24,542 - Sequence-Labeling - INFO - 	 Test Acc: 52.0
+2019-12-23 18:03:36,042 - Sequence-Labeling - INFO - Epoch 11 Loss: 15.0615
+2019-12-23 18:03:36,516 - Sequence-Labeling - INFO - 	 Dev Acc: 49.778
+2019-12-23 18:03:36,776 - Sequence-Labeling - INFO - 	 Test Acc: 52.714
+2019-12-23 18:03:49,251 - Sequence-Labeling - INFO - Epoch 12 Loss: 14.3817
+2019-12-23 18:03:49,693 - Sequence-Labeling - INFO - 	 Dev Acc: 50.889
+2019-12-23 18:03:49,972 - Sequence-Labeling - INFO - 	 Test Acc: 53.571
+2019-12-23 18:04:02,162 - Sequence-Labeling - INFO - Epoch 13 Loss: 13.7779
+2019-12-23 18:04:02,624 - Sequence-Labeling - INFO - 	 Dev Acc: 51.667
+2019-12-23 18:04:02,918 - Sequence-Labeling - INFO - 	 Test Acc: 54.143
+2019-12-23 18:04:14,543 - Sequence-Labeling - INFO - Epoch 14 Loss: 13.2731
+2019-12-23 18:04:14,958 - Sequence-Labeling - INFO - 	 Dev Acc: 52.556
+2019-12-23 18:04:15,212 - Sequence-Labeling - INFO - 	 Test Acc: 54.571
+2019-12-23 18:04:26,941 - Sequence-Labeling - INFO - Epoch 15 Loss: 12.7611
+2019-12-23 18:04:27,358 - Sequence-Labeling - INFO - 	 Dev Acc: 53.778
+2019-12-23 18:04:27,677 - Sequence-Labeling - INFO - 	 Test Acc: 55.0
+2019-12-23 18:04:39,238 - Sequence-Labeling - INFO - Epoch 16 Loss: 12.3086
+2019-12-23 18:04:39,669 - Sequence-Labeling - INFO - 	 Dev Acc: 54.667
+2019-12-23 18:04:39,992 - Sequence-Labeling - INFO - 	 Test Acc: 55.143
+2019-12-23 18:04:51,563 - Sequence-Labeling - INFO - Epoch 17 Loss: 11.9381
+2019-12-23 18:04:52,006 - Sequence-Labeling - INFO - 	 Dev Acc: 55.333
+2019-12-23 18:04:52,256 - Sequence-Labeling - INFO - 	 Test Acc: 55.857
+2019-12-23 18:05:03,821 - Sequence-Labeling - INFO - Epoch 18 Loss: 11.547
+2019-12-23 18:05:04,249 - Sequence-Labeling - INFO - 	 Dev Acc: 56.0
+2019-12-23 18:05:04,591 - Sequence-Labeling - INFO - 	 Test Acc: 56.143
+2019-12-23 18:05:16,181 - Sequence-Labeling - INFO - Epoch 19 Loss: 11.2105
+2019-12-23 18:05:16,618 - Sequence-Labeling - INFO - 	 Dev Acc: 56.444
+2019-12-23 18:05:16,891 - Sequence-Labeling - INFO - 	 Test Acc: 56.571
+2019-12-23 18:05:28,419 - Sequence-Labeling - INFO - Epoch 20 Loss: 11.8884
+2019-12-23 18:05:28,856 - Sequence-Labeling - INFO - 	 Dev Acc: 56.667
+2019-12-23 18:05:29,108 - Sequence-Labeling - INFO - 	 Test Acc: 56.714
+2019-12-23 18:05:40,649 - Sequence-Labeling - INFO - Epoch 21 Loss: 21.8836
+2019-12-23 18:05:41,078 - Sequence-Labeling - INFO - 	 Dev Acc: 56.778
+2019-12-23 18:05:41,328 - Sequence-Labeling - INFO - 	 Test Acc: 57.143
+2019-12-23 18:05:53,144 - Sequence-Labeling - INFO - Epoch 22 Loss: 10.4335
+2019-12-23 18:05:53,568 - Sequence-Labeling - INFO - 	 Dev Acc: 57.778
+2019-12-23 18:05:53,846 - Sequence-Labeling - INFO - 	 Test Acc: 57.714
+2019-12-23 18:06:05,752 - Sequence-Labeling - INFO - Epoch 23 Loss: 12.3152
+2019-12-23 18:06:06,180 - Sequence-Labeling - INFO - 	 Dev Acc: 58.667
+2019-12-23 18:06:06,436 - Sequence-Labeling - INFO - 	 Test Acc: 58.714
+2019-12-23 18:06:18,309 - Sequence-Labeling - INFO - Epoch 24 Loss: 9.9608
+2019-12-23 18:06:18,733 - Sequence-Labeling - INFO - 	 Dev Acc: 58.556
+2019-12-23 18:06:30,457 - Sequence-Labeling - INFO - Epoch 25 Loss: 9.7552
+2019-12-23 18:06:30,922 - Sequence-Labeling - INFO - 	 Dev Acc: 58.889
+2019-12-23 18:06:31,177 - Sequence-Labeling - INFO - 	 Test Acc: 59.429
+2019-12-23 18:06:43,384 - Sequence-Labeling - INFO - Epoch 26 Loss: 9.6072
+2019-12-23 18:06:43,859 - Sequence-Labeling - INFO - 	 Dev Acc: 59.667
+2019-12-23 18:06:44,115 - Sequence-Labeling - INFO - 	 Test Acc: 59.571
+2019-12-23 18:06:56,699 - Sequence-Labeling - INFO - Epoch 27 Loss: 9.3825
+2019-12-23 18:06:57,174 - Sequence-Labeling - INFO - 	 Dev Acc: 58.222
+2019-12-23 18:07:08,879 - Sequence-Labeling - INFO - Epoch 28 Loss: 1228.9691
+2019-12-23 18:07:09,314 - Sequence-Labeling - INFO - 	 Dev Acc: 60.667
+2019-12-23 18:07:09,615 - Sequence-Labeling - INFO - 	 Test Acc: 60.143
+2019-12-23 18:07:21,286 - Sequence-Labeling - INFO - Epoch 29 Loss: 9.0642
+2019-12-23 18:07:21,709 - Sequence-Labeling - INFO - 	 Dev Acc: 60.444
+2019-12-23 18:07:33,655 - Sequence-Labeling - INFO - Epoch 30 Loss: 8.9165
+2019-12-23 18:07:34,086 - Sequence-Labeling - INFO - 	 Dev Acc: 61.222
+2019-12-23 18:07:34,367 - Sequence-Labeling - INFO - 	 Test Acc: 60.714
+2019-12-23 18:07:47,286 - Sequence-Labeling - INFO - Epoch 31 Loss: 8.8187
+2019-12-23 18:07:47,732 - Sequence-Labeling - INFO - 	 Dev Acc: 61.889
+2019-12-23 18:07:48,044 - Sequence-Labeling - INFO - 	 Test Acc: 60.429
+2019-12-23 18:08:00,223 - Sequence-Labeling - INFO - Epoch 32 Loss: 8.6454
+2019-12-23 18:08:00,641 - Sequence-Labeling - INFO - 	 Dev Acc: 62.222
+2019-12-23 18:08:00,893 - Sequence-Labeling - INFO - 	 Test Acc: 61.286
+2019-12-23 18:08:12,486 - Sequence-Labeling - INFO - Epoch 33 Loss: 8.5223
+2019-12-23 18:08:12,908 - Sequence-Labeling - INFO - 	 Dev Acc: 61.889
+2019-12-23 18:08:24,496 - Sequence-Labeling - INFO - Epoch 34 Loss: 8.3961
+2019-12-23 18:08:24,946 - Sequence-Labeling - INFO - 	 Dev Acc: 61.889
+2019-12-23 18:08:36,612 - Sequence-Labeling - INFO - Epoch 35 Loss: 8.291
+2019-12-23 18:08:37,078 - Sequence-Labeling - INFO - 	 Dev Acc: 62.0
+2019-12-23 18:08:48,744 - Sequence-Labeling - INFO - Epoch 36 Loss: 8.1694
+2019-12-23 18:08:49,177 - Sequence-Labeling - INFO - 	 Dev Acc: 62.222
+2019-12-23 18:09:00,842 - Sequence-Labeling - INFO - Epoch 37 Loss: 8.0756
+2019-12-23 18:09:01,282 - Sequence-Labeling - INFO - 	 Dev Acc: 61.778
+2019-12-23 18:09:12,828 - Sequence-Labeling - INFO - Epoch 38 Loss: 8.0107
+2019-12-23 18:09:13,251 - Sequence-Labeling - INFO - 	 Dev Acc: 62.556
+2019-12-23 18:09:13,503 - Sequence-Labeling - INFO - 	 Test Acc: 62.857
+2019-12-23 18:09:25,100 - Sequence-Labeling - INFO - Epoch 39 Loss: 5494.16
+2019-12-23 18:09:25,550 - Sequence-Labeling - INFO - 	 Dev Acc: 62.667
+2019-12-23 18:09:25,822 - Sequence-Labeling - INFO - 	 Test Acc: 62.286
+2019-12-23 18:09:37,511 - Sequence-Labeling - INFO - Epoch 40 Loss: 8.5225
+2019-12-23 18:09:37,938 - Sequence-Labeling - INFO - 	 Dev Acc: 62.778
+2019-12-23 18:09:38,192 - Sequence-Labeling - INFO - 	 Test Acc: 62.571
+2019-12-23 18:09:49,849 - Sequence-Labeling - INFO - Epoch 41 Loss: 7.7973
+2019-12-23 18:09:50,299 - Sequence-Labeling - INFO - 	 Dev Acc: 62.778
+2019-12-23 18:10:02,059 - Sequence-Labeling - INFO - Epoch 42 Loss: 7.7158
+2019-12-23 18:10:02,468 - Sequence-Labeling - INFO - 	 Dev Acc: 63.0
+2019-12-23 18:10:02,720 - Sequence-Labeling - INFO - 	 Test Acc: 63.0
+2019-12-23 18:10:14,483 - Sequence-Labeling - INFO - Epoch 43 Loss: 7.7657
+2019-12-23 18:10:14,912 - Sequence-Labeling - INFO - 	 Dev Acc: 63.111
+2019-12-23 18:10:15,163 - Sequence-Labeling - INFO - 	 Test Acc: 62.857
+2019-12-23 18:10:26,882 - Sequence-Labeling - INFO - Epoch 44 Loss: 7.5658
+2019-12-23 18:10:27,300 - Sequence-Labeling - INFO - 	 Dev Acc: 63.222
+2019-12-23 18:10:27,564 - Sequence-Labeling - INFO - 	 Test Acc: 63.0
+2019-12-23 18:10:39,197 - Sequence-Labeling - INFO - Epoch 45 Loss: 8.8026
+2019-12-23 18:10:39,633 - Sequence-Labeling - INFO - 	 Dev Acc: 63.333
+2019-12-23 18:10:39,885 - Sequence-Labeling - INFO - 	 Test Acc: 63.0
+2019-12-23 18:10:51,467 - Sequence-Labeling - INFO - Epoch 46 Loss: 7.4339
+2019-12-23 18:10:51,922 - Sequence-Labeling - INFO - 	 Dev Acc: 62.667
+2019-12-23 18:11:03,540 - Sequence-Labeling - INFO - Epoch 47 Loss: 7.3606
+2019-12-23 18:11:03,954 - Sequence-Labeling - INFO - 	 Dev Acc: 62.889
+2019-12-23 18:11:15,479 - Sequence-Labeling - INFO - Epoch 48 Loss: 7.2976
+2019-12-23 18:11:15,909 - Sequence-Labeling - INFO - 	 Dev Acc: 63.111
+2019-12-23 18:11:27,436 - Sequence-Labeling - INFO - Epoch 49 Loss: 7.2419
+2019-12-23 18:11:27,847 - Sequence-Labeling - INFO - 	 Dev Acc: 63.444
+2019-12-23 18:11:28,110 - Sequence-Labeling - INFO - 	 Test Acc: 63.714
+2019-12-23 18:11:39,708 - Sequence-Labeling - INFO - Epoch 50 Loss: 7.1751
+2019-12-23 18:11:40,133 - Sequence-Labeling - INFO - 	 Dev Acc: 63.556
+2019-12-23 18:11:40,390 - Sequence-Labeling - INFO - 	 Test Acc: 63.429
+2019-12-23 18:11:51,928 - Sequence-Labeling - INFO - Epoch 51 Loss: 8.2581
+2019-12-23 18:11:52,346 - Sequence-Labeling - INFO - 	 Dev Acc: 63.556
+2019-12-23 18:12:03,997 - Sequence-Labeling - INFO - Epoch 52 Loss: 7.0667
+2019-12-23 18:12:04,402 - Sequence-Labeling - INFO - 	 Dev Acc: 63.667
+2019-12-23 18:12:04,659 - Sequence-Labeling - INFO - 	 Test Acc: 63.714
+2019-12-23 18:12:16,355 - Sequence-Labeling - INFO - Epoch 53 Loss: 7.3056
+2019-12-23 18:12:16,774 - Sequence-Labeling - INFO - 	 Dev Acc: 63.889
+2019-12-23 18:12:17,028 - Sequence-Labeling - INFO - 	 Test Acc: 64.0
+2019-12-23 18:12:28,626 - Sequence-Labeling - INFO - Epoch 54 Loss: 7.1005
+2019-12-23 18:12:29,041 - Sequence-Labeling - INFO - 	 Dev Acc: 63.889
+2019-12-23 18:12:40,613 - Sequence-Labeling - INFO - Epoch 55 Loss: 6.9121
+2019-12-23 18:12:41,145 - Sequence-Labeling - INFO - 	 Dev Acc: 64.111
+2019-12-23 18:12:41,402 - Sequence-Labeling - INFO - 	 Test Acc: 64.286
+2019-12-23 18:12:53,712 - Sequence-Labeling - INFO - Epoch 56 Loss: 7.1853
+2019-12-23 18:12:54,163 - Sequence-Labeling - INFO - 	 Dev Acc: 64.111
+2019-12-23 18:13:05,978 - Sequence-Labeling - INFO - Epoch 57 Loss: 6.8191
+2019-12-23 18:13:06,384 - Sequence-Labeling - INFO - 	 Dev Acc: 64.111
+2019-12-23 18:13:18,006 - Sequence-Labeling - INFO - Epoch 58 Loss: 6.7703
+2019-12-23 18:13:18,422 - Sequence-Labeling - INFO - 	 Dev Acc: 64.222
+2019-12-23 18:13:18,730 - Sequence-Labeling - INFO - 	 Test Acc: 64.429
+2019-12-23 18:13:30,310 - Sequence-Labeling - INFO - Epoch 59 Loss: 8.7976
+2019-12-23 18:13:30,755 - Sequence-Labeling - INFO - 	 Dev Acc: 64.667
+2019-12-23 18:13:31,008 - Sequence-Labeling - INFO - 	 Test Acc: 64.714
+2019-12-23 18:13:42,951 - Sequence-Labeling - INFO - Epoch 60 Loss: 7.0327
+2019-12-23 18:13:43,373 - Sequence-Labeling - INFO - 	 Dev Acc: 64.444
+2019-12-23 18:13:55,045 - Sequence-Labeling - INFO - Epoch 61 Loss: 6.634
+2019-12-23 18:13:55,464 - Sequence-Labeling - INFO - 	 Dev Acc: 64.444
+2019-12-23 18:14:06,958 - Sequence-Labeling - INFO - Epoch 62 Loss: 12.8858
+2019-12-23 18:14:07,391 - Sequence-Labeling - INFO - 	 Dev Acc: 64.556
+2019-12-23 18:14:19,052 - Sequence-Labeling - INFO - Epoch 63 Loss: 6.5572
+2019-12-23 18:14:19,486 - Sequence-Labeling - INFO - 	 Dev Acc: 64.667
+2019-12-23 18:14:31,311 - Sequence-Labeling - INFO - Epoch 64 Loss: 6.7643
+2019-12-23 18:14:31,728 - Sequence-Labeling - INFO - 	 Dev Acc: 64.444
+2019-12-23 18:14:43,408 - Sequence-Labeling - INFO - Epoch 65 Loss: 4890775.3231
+2019-12-23 18:14:43,980 - Sequence-Labeling - INFO - 	 Dev Acc: 62.111
+2019-12-23 18:14:43,981 - Sequence-Labeling - INFO - Best Epoch: 59 Dev ACC: 64.667Test ACC: 64.714
+2019-12-23 18:14:43,986 - Sequence-Labeling - INFO - After tunning var. Here we tunning mu
+2019-12-23 18:14:52,352 - Sequence-Labeling - INFO - Epoch 0 Loss: 6.2369
+2019-12-23 18:14:52,785 - Sequence-Labeling - INFO - 	 Dev Acc: 64.889
+2019-12-23 18:14:53,063 - Sequence-Labeling - INFO - 	 Test Acc: 63.429
+2019-12-23 18:15:01,316 - Sequence-Labeling - INFO - Epoch 1 Loss: 5.747
+2019-12-23 18:15:01,738 - Sequence-Labeling - INFO - 	 Dev Acc: 67.444
+2019-12-23 18:15:01,994 - Sequence-Labeling - INFO - 	 Test Acc: 64.571
+2019-12-23 18:15:10,206 - Sequence-Labeling - INFO - Epoch 2 Loss: 5.3866
+2019-12-23 18:15:10,630 - Sequence-Labeling - INFO - 	 Dev Acc: 69.333
+2019-12-23 18:15:10,930 - Sequence-Labeling - INFO - 	 Test Acc: 66.286
+2019-12-23 18:15:19,243 - Sequence-Labeling - INFO - Epoch 3 Loss: 5.0905
+2019-12-23 18:15:19,705 - Sequence-Labeling - INFO - 	 Dev Acc: 70.111
+2019-12-23 18:15:19,984 - Sequence-Labeling - INFO - 	 Test Acc: 67.571
+2019-12-23 18:15:28,217 - Sequence-Labeling - INFO - Epoch 4 Loss: 4.855
+2019-12-23 18:15:28,648 - Sequence-Labeling - INFO - 	 Dev Acc: 71.333
+2019-12-23 18:15:28,919 - Sequence-Labeling - INFO - 	 Test Acc: 68.714
+2019-12-23 18:15:37,120 - Sequence-Labeling - INFO - Epoch 5 Loss: 4.6574
+2019-12-23 18:15:37,597 - Sequence-Labeling - INFO - 	 Dev Acc: 71.889
+2019-12-23 18:15:37,882 - Sequence-Labeling - INFO - 	 Test Acc: 69.571
+2019-12-23 18:15:46,171 - Sequence-Labeling - INFO - Epoch 6 Loss: 4.4888
+2019-12-23 18:15:46,595 - Sequence-Labeling - INFO - 	 Dev Acc: 72.444
+2019-12-23 18:15:46,870 - Sequence-Labeling - INFO - 	 Test Acc: 70.429
+2019-12-23 18:15:55,163 - Sequence-Labeling - INFO - Epoch 7 Loss: 4.3336
+2019-12-23 18:15:55,582 - Sequence-Labeling - INFO - 	 Dev Acc: 72.889
+2019-12-23 18:15:55,852 - Sequence-Labeling - INFO - 	 Test Acc: 71.571
+2019-12-23 18:16:04,126 - Sequence-Labeling - INFO - Epoch 8 Loss: 4.2005
+2019-12-23 18:16:04,558 - Sequence-Labeling - INFO - 	 Dev Acc: 73.0
+2019-12-23 18:16:04,857 - Sequence-Labeling - INFO - 	 Test Acc: 71.857
+2019-12-23 18:16:13,214 - Sequence-Labeling - INFO - Epoch 9 Loss: 4.0891
+2019-12-23 18:16:13,661 - Sequence-Labeling - INFO - 	 Dev Acc: 73.667
+2019-12-23 18:16:13,960 - Sequence-Labeling - INFO - 	 Test Acc: 72.857
+2019-12-23 18:16:22,207 - Sequence-Labeling - INFO - Epoch 10 Loss: 3.9785
+2019-12-23 18:16:22,677 - Sequence-Labeling - INFO - 	 Dev Acc: 73.778
+2019-12-23 18:16:22,941 - Sequence-Labeling - INFO - 	 Test Acc: 73.429
+2019-12-23 18:16:31,147 - Sequence-Labeling - INFO - Epoch 11 Loss: 3.8837
+2019-12-23 18:16:31,566 - Sequence-Labeling - INFO - 	 Dev Acc: 74.222
+2019-12-23 18:16:31,820 - Sequence-Labeling - INFO - 	 Test Acc: 73.571
+2019-12-23 18:16:40,050 - Sequence-Labeling - INFO - Epoch 12 Loss: 3.7964
+2019-12-23 18:16:40,532 - Sequence-Labeling - INFO - 	 Dev Acc: 74.889
+2019-12-23 18:16:40,788 - Sequence-Labeling - INFO - 	 Test Acc: 73.571
+2019-12-23 18:16:48,977 - Sequence-Labeling - INFO - Epoch 13 Loss: 3.7115
+2019-12-23 18:16:49,409 - Sequence-Labeling - INFO - 	 Dev Acc: 74.556
+2019-12-23 18:16:57,620 - Sequence-Labeling - INFO - Epoch 14 Loss: 3.6385
+2019-12-23 18:16:58,047 - Sequence-Labeling - INFO - 	 Dev Acc: 74.667
+2019-12-23 18:17:06,303 - Sequence-Labeling - INFO - Epoch 15 Loss: 3.5699
+2019-12-23 18:17:06,716 - Sequence-Labeling - INFO - 	 Dev Acc: 74.778
+2019-12-23 18:17:14,954 - Sequence-Labeling - INFO - Epoch 16 Loss: 3.5026
+2019-12-23 18:17:15,396 - Sequence-Labeling - INFO - 	 Dev Acc: 75.222
+2019-12-23 18:17:15,651 - Sequence-Labeling - INFO - 	 Test Acc: 74.0
+2019-12-23 18:17:23,836 - Sequence-Labeling - INFO - Epoch 17 Loss: 3.4408
+2019-12-23 18:17:24,311 - Sequence-Labeling - INFO - 	 Dev Acc: 75.889
+2019-12-23 18:17:24,567 - Sequence-Labeling - INFO - 	 Test Acc: 74.286
+2019-12-23 18:17:32,808 - Sequence-Labeling - INFO - Epoch 18 Loss: 3.3823
+2019-12-23 18:17:33,226 - Sequence-Labeling - INFO - 	 Dev Acc: 75.889
+2019-12-23 18:17:41,484 - Sequence-Labeling - INFO - Epoch 19 Loss: 3.3331
+2019-12-23 18:17:41,916 - Sequence-Labeling - INFO - 	 Dev Acc: 76.111
+2019-12-23 18:17:42,173 - Sequence-Labeling - INFO - 	 Test Acc: 74.286
+2019-12-23 18:17:50,396 - Sequence-Labeling - INFO - Epoch 20 Loss: 3.2852
+2019-12-23 18:17:50,829 - Sequence-Labeling - INFO - 	 Dev Acc: 76.0
+2019-12-23 18:17:59,149 - Sequence-Labeling - INFO - Epoch 21 Loss: 3.2329
+2019-12-23 18:17:59,573 - Sequence-Labeling - INFO - 	 Dev Acc: 76.222
+2019-12-23 18:17:59,827 - Sequence-Labeling - INFO - 	 Test Acc: 74.0
+2019-12-23 18:18:08,064 - Sequence-Labeling - INFO - Epoch 22 Loss: 3.1909
+2019-12-23 18:18:08,497 - Sequence-Labeling - INFO - 	 Dev Acc: 76.444
+2019-12-23 18:18:08,755 - Sequence-Labeling - INFO - 	 Test Acc: 74.143
+2019-12-23 18:18:17,048 - Sequence-Labeling - INFO - Epoch 23 Loss: 3.1514
+2019-12-23 18:18:17,476 - Sequence-Labeling - INFO - 	 Dev Acc: 76.111
+2019-12-23 18:18:25,723 - Sequence-Labeling - INFO - Epoch 24 Loss: 3.1071
+2019-12-23 18:18:26,173 - Sequence-Labeling - INFO - 	 Dev Acc: 76.222
+2019-12-23 18:18:34,349 - Sequence-Labeling - INFO - Epoch 25 Loss: 3.0743
+2019-12-23 18:18:34,774 - Sequence-Labeling - INFO - 	 Dev Acc: 76.0
+2019-12-23 18:18:42,969 - Sequence-Labeling - INFO - Epoch 26 Loss: 3.0373
+2019-12-23 18:18:43,404 - Sequence-Labeling - INFO - 	 Dev Acc: 76.333
+2019-12-23 18:18:51,645 - Sequence-Labeling - INFO - Epoch 27 Loss: 3.0066
+2019-12-23 18:18:52,075 - Sequence-Labeling - INFO - 	 Dev Acc: 76.333
+2019-12-23 18:19:00,352 - Sequence-Labeling - INFO - Epoch 28 Loss: 2.977
+2019-12-23 18:19:00,810 - Sequence-Labeling - INFO - 	 Dev Acc: 76.667
+2019-12-23 18:19:01,074 - Sequence-Labeling - INFO - 	 Test Acc: 74.286
+2019-12-23 18:19:09,253 - Sequence-Labeling - INFO - Epoch 29 Loss: 2.9452
+2019-12-23 18:19:09,689 - Sequence-Labeling - INFO - 	 Dev Acc: 76.778
+2019-12-23 18:19:09,964 - Sequence-Labeling - INFO - 	 Test Acc: 74.714
+2019-12-23 18:19:18,114 - Sequence-Labeling - INFO - Epoch 30 Loss: 2.9158
+2019-12-23 18:19:18,569 - Sequence-Labeling - INFO - 	 Dev Acc: 76.889
+2019-12-23 18:19:18,822 - Sequence-Labeling - INFO - 	 Test Acc: 74.571
+2019-12-23 18:19:27,018 - Sequence-Labeling - INFO - Epoch 31 Loss: 2.8891
+2019-12-23 18:19:27,471 - Sequence-Labeling - INFO - 	 Dev Acc: 76.889
+2019-12-23 18:19:35,708 - Sequence-Labeling - INFO - Epoch 32 Loss: 2.8598
+2019-12-23 18:19:36,162 - Sequence-Labeling - INFO - 	 Dev Acc: 76.778
+2019-12-23 18:19:44,430 - Sequence-Labeling - INFO - Epoch 33 Loss: 2.8379
+2019-12-23 18:19:44,851 - Sequence-Labeling - INFO - 	 Dev Acc: 76.667
+2019-12-23 18:19:53,124 - Sequence-Labeling - INFO - Epoch 34 Loss: 2.8084
+2019-12-23 18:19:53,593 - Sequence-Labeling - INFO - 	 Dev Acc: 76.667
+2019-12-23 18:20:01,738 - Sequence-Labeling - INFO - Epoch 35 Loss: 2.7899
+2019-12-23 18:20:02,151 - Sequence-Labeling - INFO - 	 Dev Acc: 76.889
+2019-12-23 18:20:10,563 - Sequence-Labeling - INFO - Epoch 36 Loss: 2.7671
+2019-12-23 18:20:11,024 - Sequence-Labeling - INFO - 	 Dev Acc: 76.667
+2019-12-23 18:20:11,024 - Sequence-Labeling - INFO - Best Epoch: 30 Dev ACC: 76.889Test ACC: 74.571
