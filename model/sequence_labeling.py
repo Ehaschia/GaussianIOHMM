@@ -31,7 +31,7 @@ class GaussianSequenceLabeling(nn.Module):
         reset_embedding(mu_embedding, self.emission_mu_embedding, self.dim, True,
                         far_init=FAR_EMISSION_MU)
         reset_embedding(var_embedding, self.emission_cho_embedding, self.dim, EMISSION_CHO_GRAD,
-                        far_init=False)
+                        far_init=False, var=True)
         self.reset_parameter(init_var_scale)
 
     def reset_parameter(self, init_var_scale):
@@ -239,7 +239,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
             nn.init.xavier_normal_(self.output_mu)
         # output var init
         if output_cho_scale == 0:
-            nn.init.uniform_(self.output_cho)
+            nn.init.uniform_(self.output_cho, a=0.1, b=1.0)
         else:
             nn.init.constant_(self.output_cho, output_cho_scale)
 

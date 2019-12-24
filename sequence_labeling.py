@@ -171,7 +171,7 @@ def main():
     # Default: util 6 epoch not update best_epoch
     # If aim_epoch is not 0. It will train aim_epoch times.
     def train(best_epoch, thread=6, aim_epoch=0):
-        epoch = 0
+        epoch = best_epoch[0] + 1
         while epoch - best_epoch[0] <= thread:
             epoch_loss = 0
             random.shuffle(train_dataset)

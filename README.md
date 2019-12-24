@@ -22,8 +22,14 @@ Next week (12/17-12/24) need to do:
 
 ### Issue
 
-The current issue under issue dictionary
+The current issues that are under processing dictionary
 
-*   sequence labeling forward issue: 
+1.   ~~sequence labeling forward issue:~~ 
+      
+      Before fixed, we used `forward=True` in `gaussian_multiply_integral` function during backward.
 
-    Before fixing, we used `forward=True` in `gaussian_multiply_integral` function during backward.
+2.  ~~Loss increase during training.~~
+    
+    After fixed issue 1, the loss changed sharply and may increase during training.
+    
+    **Fixed**: Due to in and out var init is too small. Re-implement random init part.
