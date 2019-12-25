@@ -1,8 +1,8 @@
 # Mixture Gaussian Input Output Hidden Markov Model
 
 ### TODO
-* Implement placeholder for mixture gaussian case.
-* Unit Test for Mixture Gaussian Sequence Labeling
+* ~~Implement placeholder for mixture gaussian case.~~
+* Unit Test for Mixture Gaussian Sequence Labeling.
 * ~~grid search tunner~~:
     * ~~unknown error: not running but the thread is not ready.~~
     * ~~clean code~~
@@ -13,12 +13,14 @@
 * Investigate the benefit of our graph model. (Like known several truth label)
 * Investigate how to express interpretability.
 * Implement IOHMM
+* Investigate the use of inverse wishart prior
+* accelerate:
+    * No update var: pre calculate inverse and store.
+    * Update Var: implement pseudo inverse like [Moore–Penrose inverse](https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse)
 
-
-Next week (12/17-12/24) need to do:
+Next week (12/25-12/31) need to do:
 * Implement IOHMM
-* ~~fix grid search tunner bug~~
-* ~~mixture gaussian unit test~~
+* Investigate the use of inverse wishart prior
 
 ### Issue
 
@@ -33,3 +35,4 @@ The current issues that are under processing dictionary
     After fixed issue 1, the loss changed sharply and may increase during training.
     
     **Fixed**: Due to in and out var init is too small. Re-implement random init part.
+3. Current loss also shown increase during training. Current temporary fix is not update variance. 
