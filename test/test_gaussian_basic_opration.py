@@ -53,6 +53,20 @@ class TestGaussianMulti(unittest.TestCase):
         self.assertAlmostEqual(score.item(), - (0.5 * math.log(6 * math.pi) + 1.0 / 216.0))
 
 
+class TestFastGaussianMulti(unittest.TestCase):
+    def setUp(self) -> None:
+        self.mu0 = torch.tensor([0.5])
+        self.sigma0 = torch.tensor([[2.0]])
+        self.mu1 = torch.tensor([1.0 / 3.0])
+        self.sigma1 = torch.tensor([[1.0]])
+
+    def test_one_dim_multiply(self):
+        score, mu, sigma = fast_gaussian_multi(self.mu0, self.mu1, self.sigma0, self.sigma1, diag0=True, diag1=True)
+        self.assertAlmostEqual(sigma.item(), 2.0 / 3.0)
+        self.assertAlmostEqual(mu.item(), 7.0 / 18.0)
+        self.assertAlmostEqual(score.item(), - (0.5 * math.log(6 * math.pi) + 1.0 / 216.0))
+
+
 class TestGaussianMultiIntegral(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -100,6 +114,7 @@ class TestGaussianMultiIntegral(unittest.TestCase):
         zeta = -0.5 * (2 * math.log(2 * math.pi) - np.log(np.linalg.det(lam)) + eta.dot(golden_sigma.dot(eta)))
         golden_score = zeta0 + zeta1 - zeta
         self.assertAlmostEqual(golden_score, score.item(), 6)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -55,8 +55,31 @@ def calculate_zeta(eta: torch.Tensor, lam: torch.Tensor,
     return -0.5 * (part1 - part2 + part3)
 
 
+# used for diagonal gaussian, thus lam is [batch, dim]
+def fast_calculate_zeta(eta: torch.Tensor, lam: torch.Tensor,
+                        mu: torch.Tensor = None, sig: torch.Tensor = None) -> torch.Tensor:
+    # zeta in log format
+    # zeta = - 0.5 * (dim * log 2pi  - log|lam| + eta^T * lam^{-1} * eta)
+    # zeta = - 0.5 * (dim * log 2pi  + log|sigma| + eta^T * sigma * eta)
+    # TODO optimize calculate process, such as determinate and inverse
+
+    dim = lam.size(-1)
+    part1 = dim * np.log(np.pi * 2)
+
+    part2 = torch.sum(torch.log(lam), dim=-1)
+
+    if mu is not None:
+        part3 = torch.matmul(eta.unsqueeze(-2), mu.unsqueeze(-1)).reshape_as(part2)
+    else:
+        if sig is None:  # and mu is None:
+            sig = 1.0 / lam
+        part3 = torch.chain_matmul(eta.unsqueeze(-2), sig, eta.unsqueeze(-1)).reshape_as(part2)
+
+    return -0.5 * (part1 - part2 + part3)
+
+
 # multiply two same dimension gaussian
-# Input format should be [batch, dim]
+# Input format should be [batch, dim] and [batch, dim, dim] for mu and var, respectively.
 def gaussian_multi(mu0: torch.Tensor, mu1: torch.Tensor,
                    var0: torch.Tensor, var1: torch.Tensor,
                    need_zeta=True) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -74,6 +97,63 @@ def gaussian_multi(mu0: torch.Tensor, mu1: torch.Tensor,
         zeta0 = calculate_zeta(eta0, lambda0, mu=mu0)
         zeta1 = calculate_zeta(eta1, lambda1, mu=mu1)
         zeta_new = calculate_zeta(eta_new, lambda_new, mu=mu_new)
+
+        score = zeta0 + zeta1 - zeta_new
+    else:
+        score = None
+    return score, mu_new, sigma_new
+
+
+# diag0 and diag1 is if using high speed inverse
+def fast_gaussian_multi(mu0: torch.Tensor, mu1: torch.Tensor,
+                        var0: torch.Tensor, var1: torch.Tensor,
+                        need_zeta=True, diag0=False, diag1=False):
+    if diag0:
+        lambda0 = 1.0 / var0
+        eta0 = lambda0 * mu0
+    else:
+        lambda0 = torch.inverse(var0)
+        eta0 = torch.matmul(lambda0, mu0.unsqueeze(-1)).squeeze(-1)
+
+    if diag1:
+        lambda1 = 1.0 / var1
+        eta1 = lambda1 * mu1
+    else:
+        lambda1 = torch.inverse(var1)
+        eta1 = torch.matmul(lambda1, mu1.unsqueeze(-1)).squeeze(-1)
+
+    # xor to get same shape
+    if not diag0 ^ diag1:
+        lambda_new = lambda0 + lambda1
+    elif not diag0:
+        lambda_new = lambda0 + torch.diag_embed(lambda1).float()
+    elif not diag1:
+        lambda_new = torch.diag_embed(lambda0).float() + lambda1
+
+    eta_new = eta0 + eta1
+
+    if diag0 and diag1:
+        sigma_new = 1.0 / lambda_new
+        mu_new = torch.matmul(sigma_new, eta_new.unsqueeze(-1)).squeeze(-1)
+    else:
+        sigma_new = torch.inverse(lambda_new)
+        mu_new = torch.matmul(sigma_new, eta_new.unsqueeze(-1)).squeeze(-1)
+
+    if need_zeta:
+        if diag0:
+            zeta0 = fast_calculate_zeta(eta0, lambda0, mu=mu0)
+        else:
+            zeta0 = calculate_zeta(eta0, lambda0, mu=mu0)
+
+        if diag1:
+            zeta1 = fast_calculate_zeta(eta1, lambda1, mu=mu1)
+        else:
+            zeta1 = calculate_zeta(eta1, lambda1, mu=mu1)
+
+        if diag0 and diag1:
+            zeta_new = fast_calculate_zeta(eta_new, lambda_new, mu=mu_new)
+        else:
+            zeta_new = calculate_zeta(eta_new, lambda_new, mu=mu_new)
 
         score = zeta0 + zeta1 - zeta_new
     else:
@@ -101,6 +181,63 @@ def gaussian_multi_integral(mu0: torch.Tensor, mu1: torch.Tensor,
 
     lambda0 = torch.inverse(var0)
     lambda1 = torch.inverse(var1)
+
+    # use new variable avoid in-place operation
+    mu0_new = mu0.unsqueeze(-1)
+    mu1_new = mu1.unsqueeze(-1)
+    eta0 = torch.matmul(lambda0, mu0_new).squeeze(-1)
+    eta1 = torch.matmul(lambda1, mu1_new).squeeze(-1)
+    # mu0_new = mu0_new.squeeze(-1)
+
+    eta1_pad = F.pad(eta1, mu_pad, 'constant', 0)
+    lambda1_pad = F.pad(lambda1, var_pad, 'constant', 0)
+
+    lambda_new = lambda0 + lambda1_pad
+    eta_new = eta0 + eta1_pad
+
+    sigma_new = torch.inverse(lambda_new)
+    mu_new = torch.matmul(sigma_new, eta_new.unsqueeze(-1)).squeeze(-1)
+
+    if need_zeta:
+        zeta0 = calculate_zeta(eta0, lambda0, mu=mu0)
+        zeta1 = calculate_zeta(eta1, lambda1, mu=mu1)
+        zeta_new = calculate_zeta(eta_new, lambda_new, sig=sigma_new)
+        scale = zeta0 + zeta1 - zeta_new
+    else:
+        scale = None
+
+    select = 1 if forward else 0
+
+    res_mu = torch.split(mu_new, split_size_or_sections=[dim1, dim1], dim=-1)[select]
+    res_sigma = torch.split(torch.split(sigma_new, split_size_or_sections=[dim1, dim1], dim=-2)[select],
+                            split_size_or_sections=[dim1, dim1], dim=-1)[select]
+
+    return scale, res_mu, res_sigma
+
+
+# here mu1 is diagonal format
+# TODO store fixed gaussian to reuse here.
+def fast_gaussian_multi_integral(mu0: torch.Tensor, mu1: torch.Tensor,
+                                 var0: torch.Tensor, var1: torch.Tensor,
+                                 forward: bool = True, need_zeta: bool = True,
+                                 diag1: bool = False) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    dim0 = mu0.size()[-1]
+    dim1 = mu1.size()[-1]
+
+    assert dim0 > dim1
+
+    if forward:
+        mu_pad = (0, dim1)
+        var_pad = (0, dim1, 0, dim1)
+    else:
+        mu_pad = (dim1, 0)
+        var_pad = (dim1, 0, dim1, 0)
+
+    lambda0 = torch.inverse(var0)
+    if diag1:
+        lambda1 = torch.diag_embed(1.0 / var1).float()
+    else:
+        lambda1 = torch.inverse(var1)
 
     # use new variable avoid in-place operation
     mu0_new = mu0.unsqueeze(-1)

@@ -13,7 +13,7 @@ def hmm_generate_data_loader(root, type='train'):
     return datas
 
 
-def sequence_labeling_data_loader(root, type='train'):
+def read_sequence_labeling_data(root, type='train'):
     name = {'train': 'synthetic.train',
             'dev': 'synthetic.dev',
             'test': 'synthetic.test'}

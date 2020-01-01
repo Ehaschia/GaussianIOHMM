@@ -147,9 +147,9 @@ def main():
     device = torch.device('cuda') if args.gpu else torch.device('cpu')
     # Loading data
     logger.info('Load data....')
-    train_dataset = sequence_labeling_data_loader(root, type='train')
-    dev_dataset = sequence_labeling_data_loader(root, type='dev')
-    test_dataset = sequence_labeling_data_loader(root, type='test')
+    train_dataset = read_sequence_labeling_data(root, type='train')
+    dev_dataset = read_sequence_labeling_data(root, type='dev')
+    test_dataset = read_sequence_labeling_data(root, type='test')
 
     # build model
     model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels,
