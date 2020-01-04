@@ -89,6 +89,9 @@ def main():
     parser.add_argument('--optim', choices=['sgd', 'adam'])
     parser.add_argument('--amsgrad', action='store_true', help='AMD Grad')
     parser.add_argument('--weight_decay', type=float, default=0.0, help='weight for l2 norm decay')
+    parser.add_argument('--tran_weight', type=float, default=0.0001)
+    parser.add_argument('--input_weight', type=float, default=0.0)
+    parser.add_argument('--output_weight', type=float, default=0.0)
 
     args = parser.parse_args()
     # np.random.seed(global_variables.RANDOM_SEED)
@@ -122,6 +125,7 @@ def main():
     optim = args.optim
     amsgrad = args.amsgrad
     weight_decay = args.weight_decay
+    normalize_weight = [args.tran_weight, args.input_weight, args.output_weight]
 
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -205,7 +209,7 @@ def main():
                 words, labels, masks = data['WORD'].to(device), data['POS'].to(device), data['MASK'].to(device)
 
                 # sentences, labels, masks, revert_order = standardize_batch(samples)
-                loss = model.get_loss(words, labels, masks)
+                loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight)
                 loss.backward()
                 optimizer.step()
                 epoch_loss += (loss.item()) * words.size(0)

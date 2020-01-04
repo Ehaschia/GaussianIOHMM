@@ -59,7 +59,7 @@ def main():
     parser.add_argument(
         '--data',
         type=str,
-        default='./dataset/syntic_data_yong/0-1000-10-new',
+        default='./dataset/syntic_data_yong/0-10000-10-new',
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=20)
     parser.add_argument('--lr', type=float, default=0.001)
@@ -77,26 +77,22 @@ def main():
     parser.add_argument('--out_mu_drop', type=float, default=0.0)
     parser.add_argument('--out_cho_drop', type=float, default=0.0)
     parser.add_argument('--trans_cho_method', type=str, choices=['random', 'wishart'], default='random')
-    parser.add_argument('--input_cho_init', type=float, default=0.0,
+    parser.add_argument('--input_cho_init', type=float, default=1.0,
                         help='init method of input cholesky matrix. 0 means random. The other score means constant')
     parser.add_argument('--trans_cho_init', type=float, default=1.0,
                         help='init added scale of random version init_cho_init')
-    parser.add_argument('--output_cho_init', type=float, default=0.0,
+    parser.add_argument('--output_cho_init', type=float, default=1.0,
                         help='init method of output cholesky matrix. 0 means random. The other score means constant')
     # i_comp_num = 1, t_comp_num = 1, o_comp_num = 1, max_comp = 1,
-    parser.add_argument('--input_comp_num', type=int, default=1,
-                        help='input mixture gaussian component number')
-    parser.add_argument('--tran_comp_num', type=int, default=1,
-                        help='transition mixture gaussian component number')
-    parser.add_argument('--output_comp_num', type=int, default=1,
-                        help='output mixture gaussian component number')
-    parser.add_argument('--max_comp', type=int, default=1,
-                        help='number of max number of component')
+    parser.add_argument('--input_comp_num', type=int, default=1, help='input mixture gaussian component number')
+    parser.add_argument('--tran_comp_num', type=int, default=1, help='transition mixture gaussian component number')
+    parser.add_argument('--output_comp_num', type=int, default=1, help='output mixture gaussian component number')
+    parser.add_argument('--max_comp', type=int, default=1, help='number of max number of component')
+    parser.add_argument('--tran_weight', type=float, default=0.0001)
+    parser.add_argument('--input_weight', type=float, default=0.0)
+    parser.add_argument('--output_weight', type=float, default=0.0)
 
     args = parser.parse_args()
-    # np.random.seed(global_variables.RANDOM_SEED)
-    # torch.manual_seed(global_variables.RANDOM_SEED)
-    # random.seed(global_variables.RANDOM_SEED)
 
     np.random.seed(args.random_seed)
     torch.manual_seed(args.random_seed)
@@ -121,6 +117,7 @@ def main():
     tran_num_comp = args.tran_comp_num
     output_num_comp = args.output_comp_num
     max_comp = args.max_comp
+    normalize_weight = [args.tran_weight, args.input_weight, args.output_weight]
 
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -181,7 +178,7 @@ def main():
                 samples = train_dataset[j * batch_size: (j + 1) * batch_size]
 
                 sentences, labels, masks, revert_order = standardize_batch(samples)
-                loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device))
+                loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device), normalize_weight=normalize_weight)
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
@@ -208,13 +205,13 @@ def main():
 
     best_epoch = train(best_epoch, thread=6)
 
-    logger.info("After tunning var. Here we tunning mu")
-
-    for parameter in model.parameters():
-        # flip
-        parameter.requires_grad = not parameter.requires_grad
-
-    best_epoch = train(best_epoch)
+    # logger.info("After tunning var. Here we tunning mu")
+    #
+    # for parameter in model.parameters():
+    #     # flip
+    #     parameter.requires_grad = not parameter.requires_grad
+    #
+    # best_epoch = train(best_epoch)
 
     with open(log_dir + '/' + 'result.json', 'w') as f:
         final_result = {"Epoch": best_epoch[0],
