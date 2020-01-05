@@ -10,6 +10,7 @@ from io_module import conllx_data
 from io_module.logger import *
 from io_module.utils import iterate_data
 from model.sequence_labeling import *
+from model.weighted_iohmm import WeightIOHMM
 
 
 def evaluate(data, batch, model, device):
@@ -55,7 +56,7 @@ def main():
         default='./dataset/ptb/',
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=256)
-    parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--var_scale', type=float, default=1.0)
     parser.add_argument('--log_dir', type=str,
@@ -183,6 +184,7 @@ def main():
                                             o_comp_num=output_num_comp, max_comp=max_comp)
 
     # model = RNNSequenceLabeling("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
+    # model = WeightIOHMM(vocab_size=ntokens, nlabel=nlabels, num_state=100)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     # optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -193,9 +195,9 @@ def main():
     # util 6 epoch not update best_epoch
     num_batches = num_data // batch_size + 1
 
-    def train(best_epoch):
+    def train(best_epoch, thread=6):
         epoch = 0
-        while epoch - best_epoch[0] <= 6:
+        while epoch - best_epoch[0] <= thread:
             epoch_loss = 0
             num_back = 0
             num_words = 0
@@ -209,7 +211,8 @@ def main():
                 words, labels, masks = data['WORD'].to(device), data['POS'].to(device), data['MASK'].to(device)
 
                 # sentences, labels, masks, revert_order = standardize_batch(samples)
-                loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight)
+                # loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight)
+                loss = model.get_loss(words, labels, masks)
                 loss.backward()
                 optimizer.step()
                 epoch_loss += (loss.item()) * words.size(0)
@@ -248,7 +251,7 @@ def main():
     #     # flip
     #     parameter.requires_grad = not parameter.requires_grad
     
-    best_epoch = train(best_epoch)
+    # best_epoch = train(best_epoch)
     with open(log_dir + '/' + 'result.json', 'w') as f:
         final_result = {"Epoch": best_epoch[0],
                         "Dev": best_epoch[1] * 100,

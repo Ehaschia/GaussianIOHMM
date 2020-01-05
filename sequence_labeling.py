@@ -11,7 +11,7 @@ from tqdm import tqdm
 from io_module.data_loader import *
 from io_module.logger import *
 from model.sequence_labeling import *
-
+from model.weighted_iohmm import WeightIOHMM
 
 # out is [batch, max_len+2]
 def standardize_batch(sample_list: List) -> (torch.Tensor, torch.Tensor):
@@ -59,10 +59,10 @@ def main():
     parser.add_argument(
         '--data',
         type=str,
-        default='./dataset/syntic_data_yong/0-10000-10-new',
+        default='./dataset/syntic_data_yong/0-100000-10-new',
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=20)
-    parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--var_scale', type=float, default=1.0)
     parser.add_argument('--log_dir', type=str,
@@ -159,6 +159,7 @@ def main():
                                             o_comp_num=output_num_comp, max_comp=max_comp)
 
     # model = RNNSequenceLabeling("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
+    # model = WeightIOHMM(vocab_size=ntokens, nlabel=nlabels, num_state=10)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -179,6 +180,7 @@ def main():
 
                 sentences, labels, masks, revert_order = standardize_batch(samples)
                 loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device), normalize_weight=normalize_weight)
+                # loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device))
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
