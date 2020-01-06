@@ -490,7 +490,7 @@ class RNNSequenceLabeling(nn.Module):
         self.drop = nn.Dropout(dropout)
         self.encoder = nn.Embedding(self.ntokens, ninp)
         if rnn_type in ['LSTM', 'GRU']:
-            self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout, batch_first=True)
+            self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout, batch_first=True, bidirectional=True)
         else:
             try:
                 nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
@@ -532,7 +532,6 @@ class RNNSequenceLabeling(nn.Module):
                  masks: torch.Tensor) -> torch.Tensor:
         real_score = self.forward(sentences, masks)
         prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels) * masks
-        # TODO the loss format can fine tune. According to zechuan's investigation.
         return torch.sum(prob) / sentences.size(0)
 
     def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor,
