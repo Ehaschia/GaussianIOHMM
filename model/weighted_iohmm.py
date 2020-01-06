@@ -21,9 +21,9 @@ class WeightIOHMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.weight.data, a=0.5, b=0.5)
-        nn.init.uniform_(self.output.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.transition.data, a=0.0, b=0.7)
+        nn.init.uniform_(self.input.weight.data, a=0.0, b=0.5)
+        nn.init.uniform_(self.output.data, a=0.0, b=0.5)
 
     def forward(self, sentences: torch.Tensor) -> torch.Tensor:
         batch, maxlen = sentences.size()
