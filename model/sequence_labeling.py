@@ -227,7 +227,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
             weight = torch.tril(weight)
             self.transition_cho.data = weight + t_cho_scale * torch.eye(2 * self.dim)
         elif trans_cho_method == 'wishart':
-            transition_var = invwishart.rvs(2 * self.dim, np.eye(2 * self.dim) / 2 * self.dim,
+            transition_var = invwishart.rvs(2 * self.dim, (4*self.dim+1) * np.eye(2 * self.dim),
                                             size=self.t_comp_num, random_state=None)
             self.transition_cho.data = torch.from_numpy(np.linalg.cholesky(transition_var)).float()
         else:
