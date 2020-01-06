@@ -59,10 +59,10 @@ def main():
     parser.add_argument(
         '--data',
         type=str,
-        default='./dataset/syntic_data_yong/0-100000-10-new',
+        default='./dataset/syntic_data_yong/0-1000-10-new',
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=20)
-    parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--var_scale', type=float, default=1.0)
     parser.add_argument('--log_dir', type=str,
@@ -91,6 +91,9 @@ def main():
     parser.add_argument('--tran_weight', type=float, default=0.0001)
     parser.add_argument('--input_weight', type=float, default=0.0)
     parser.add_argument('--output_weight', type=float, default=0.0)
+    parser.add_argument('--emission_cho_grad', type=bool, default=False)
+    parser.add_argument('--transition_cho_grad', type=bool, default=True)
+    parser.add_argument('--decode_cho_grad', type=bool, default=False)
 
     args = parser.parse_args()
 
@@ -119,6 +122,10 @@ def main():
     max_comp = args.max_comp
     normalize_weight = [args.tran_weight, args.input_weight, args.output_weight]
 
+    EMISSION_CHO_GRAD = args.emission_cho_grad
+    TRANSITION_CHO_GRAD = args.transition_cho_grad
+    DECODE_CHO_GRAD = args.decode_cho_grad
+
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     save_parameter_to_json(log_dir, vars(args))
@@ -130,16 +137,6 @@ def main():
     change_handler(logger, log_dir)
     # logger = LOGGER
     logger.info(args)
-
-    logger.info('Parameter From global_variables.py')
-    logger.info('LOG_PATH:' + LOG_PATH)
-    logger.info('EMISSION_CHO_GRAD:' + str(EMISSION_CHO_GRAD))
-    logger.info('TRANSITION_CHO_GRAD:' + str(TRANSITION_CHO_GRAD))
-    logger.info('DECODE_CHO_GRAD:' + str(DECODE_CHO_GRAD))
-    logger.info('FAR_TRANSITION_MU:' + str(FAR_TRANSITION_MU))
-    logger.info('FAR_DECODE_MU:' + str(FAR_DECODE_MU))
-    logger.info('FAR_EMISSION_MU:' + str(FAR_EMISSION_MU))
-    logger.info('RANDOM_SEED:' + str(args.random_seed))
 
     device = torch.device('cuda') if args.gpu else torch.device('cpu')
     # Loading data
