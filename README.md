@@ -1,6 +1,7 @@
 # Mixture Gaussian Input Output Hidden Markov Model
 
 ### TODO
+#### Gaussian IOHMM
 * ~~Implement placeholder for mixture gaussian case.~~
 * Unit Test for Mixture Gaussian Sequence Labeling.
 * ~~grid search tunner~~:
@@ -12,15 +13,18 @@
     * it seems work. Need to investigate the best strategy. 
 * Investigate the benefit of our graph model. (Like known several truth label)
 * Investigate how to express interpretability.
-* Implement IOHMM
-* Investigate the use of inverse wishart prior
+* ~~Implement IOHMM~~
+* ~~Investigate the use of inverse wishart prior~~
+    * inverse wishart prior can significantly reduce training error (keep positive define).
 * accelerate:
-    * No update var: pre calculate inverse and store.
+    * ~~No update var: pre calculate inverse and store.~~
+        * Not useful for multi gaussian, thus useless.
     * Update Var: implement pseudo inverse like [Moore–Penrose inverse](https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse)
 
-Next week (12/25-12/31) need to do:
-* Implement IOHMM
-* Investigate the use of inverse wishart prior
+#### IOHMM
+* log format
+* higher dim test, and other trick
+* add reg term. (avoid the plain priority of model)
 
 ### Issue
 
@@ -35,4 +39,6 @@ The current issues that are under processing dictionary
     After fixed issue 1, the loss changed sharply and may increase during training.
     
     **Fixed**: Due to in and out var init is too small. Re-implement random init part.
-3. Current loss also shown increase during training. Current temporary fix is not update variance. 
+3. ~~Current loss also shown increase during training. Current temporary fix is not update variance.~~
+     
+     **Fixed**: wishart prior
