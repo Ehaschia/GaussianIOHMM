@@ -5,13 +5,16 @@ import math
 import random
 from typing import List
 
-import torch.optim as optim
+from torch.optim import SGD
+from torch.optim.adamw import AdamW
+
 from tqdm import tqdm
 
 from io_module.data_loader import *
 from io_module.logger import *
 from model.sequence_labeling import *
 from model.weighted_iohmm import WeightIOHMM
+from optim.lr_scheduler import ExponentialScheduler
 
 # out is [batch, max_len+2]
 def standardize_batch(sample_list: List) -> (torch.Tensor, torch.Tensor):
@@ -34,6 +37,15 @@ def standardize_batch(sample_list: List) -> (torch.Tensor, torch.Tensor):
     return torch.tensor(standardized_sentence_list).long(), torch.tensor(standardized_label_list).long(), \
            torch.tensor(mask_list).long(), torch.tensor(revert_idx_list).long()
 
+def get_optimizer(parameters, optim, learning_rate, amsgrad, weight_decay, lr_decay, warmup_steps):
+    if optim == 'sgd':
+        optimizer = SGD(parameters, lr=learning_rate, momentum=0.9, weight_decay=weight_decay, nesterov=True)
+    else:
+        optimizer = AdamW(parameters, lr=learning_rate, betas=(0.9, 0.999), eps=1e-8, amsgrad=amsgrad,
+                          weight_decay=weight_decay)
+    init_lr = 1e-7
+    scheduler = ExponentialScheduler(optimizer, lr_decay, warmup_steps, init_lr)
+    return optimizer, scheduler
 
 def evaluate(data, batch, model, device):
     model.eval()
@@ -63,7 +75,10 @@ def main():
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=20)
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--momentum', type=float, default=0.9)
+    parser.add_argument('--lr_decay', type=float, default=0.999995, help='Decay rate of learning rate')
+    parser.add_argument('--amsgrad', action='store_true', help='AMD Grad')
+    parser.add_argument('--weight_decay', type=float, default=0.0, help='weight for l2 norm decay')
+    parser.add_argument('--warmup_steps', type=int, default=0, metavar='N', help='number of steps to warm up (default: 0)')
     parser.add_argument('--var_scale', type=float, default=1.0)
     parser.add_argument('--log_dir', type=str,
                         default='./output/' + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + "/")
@@ -103,8 +118,16 @@ def main():
 
     log_dir = args.log_dir
     batch_size = args.batch
+
+    # setting optimizer
+    batch_size = args.batch
+    optim = args.optim
     lr = args.lr
-    momentum = args.momentum
+    lr_decay = args.lr_decay
+    warmup_steps = args.warmup_steps
+    amsgrad = args.amsgrad
+    weight_decay = args.weight_decay
+
     root = args.data
     in_mu_drop = args.in_mu_drop
     in_cho_drop = args.in_cho_drop
@@ -146,20 +169,22 @@ def main():
     test_dataset = read_sequence_labeling_data(root, type='test')
 
     # build model
-    model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels,
-                                            t_cho_method=tran_cho_method, t_cho_init=trans_cho_init,
-                                            in_cho_init=input_cho_init, out_cho_init=output_cho_init,
-                                            in_mu_drop=in_mu_drop, in_cho_drop=in_cho_drop,
-                                            t_mu_drop=t_mu_drop, t_cho_drop=t_cho_drop,
-                                            out_mu_drop=out_mu_drop, out_cho_drop=out_cho_drop,
-                                            i_comp_num=input_num_comp, t_comp_num=tran_num_comp,
-                                            o_comp_num=output_num_comp, max_comp=max_comp)
+    # model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels,
+    #                                         t_cho_method=tran_cho_method, t_cho_init=trans_cho_init,
+    #                                         in_cho_init=input_cho_init, out_cho_init=output_cho_init,
+    #                                         in_mu_drop=in_mu_drop, in_cho_drop=in_cho_drop,
+    #                                         t_mu_drop=t_mu_drop, t_cho_drop=t_cho_drop,
+    #                                         out_mu_drop=out_mu_drop, out_cho_drop=out_cho_drop,
+    #                                         i_comp_num=input_num_comp, t_comp_num=tran_num_comp,
+    #                                         o_comp_num=output_num_comp, max_comp=max_comp)
 
     # model = RNNSequenceLabeling("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
-    # model = WeightIOHMM(vocab_size=ntokens, nlabel=nlabels, num_state=10)
+    model = WeightIOHMM(vocab_size=ntokens, nlabel=nlabels, num_state=args.dim)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    parameters_need_update = filter(lambda p: p.requires_grad, model.parameters())
+    optimizer = get_optimizer(parameters_need_update, optim, lr, amsgrad, weight_decay,
+                              lr_decay=lr_decay, warmup_steps=warmup_steps)
     # depend on dev ppl
     best_epoch = (-1, 0.0, 0.0)
 
@@ -176,8 +201,8 @@ def main():
                 samples = train_dataset[j * batch_size: (j + 1) * batch_size]
 
                 sentences, labels, masks, revert_order = standardize_batch(samples)
-                loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device), normalize_weight=normalize_weight)
-                # loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device))
+                # loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device), normalize_weight=normalize_weight)
+                loss = model.get_loss(sentences.to(device), labels.to(device), masks.to(device))
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
@@ -202,7 +227,7 @@ def main():
     #     # flip
     #     parameter.requires_grad = not parameter.requires_grad
 
-    best_epoch = train(best_epoch, thread=6)
+    best_epoch = train(best_epoch, thread=50)
 
     # logger.info("After tunning var. Here we tunning mu")
     #
