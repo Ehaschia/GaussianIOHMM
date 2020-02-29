@@ -56,7 +56,7 @@ def main():
         default='./dataset/ptb/',
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=256)
-    parser.add_argument('--optim', choices=['sgd', 'adam'])
+    parser.add_argument('--optim', choices=['sgd', 'adam'], default='adam')
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--lr_decay', type=float, default=0.999995, help='Decay rate of learning rate')
     parser.add_argument('--amsgrad', action='store_true', help='AMD Grad')
@@ -98,6 +98,7 @@ def main():
     parser.add_argument('--emission_cho_grad', type=bool, default=False)
     parser.add_argument('--transition_cho_grad', type=bool, default=True)
     parser.add_argument('--decode_cho_grad', type=bool, default=False)
+    parser.add_argument('--gaussian_decode', action='store_false')
 
     args = parser.parse_args()
     # np.random.seed(global_variables.RANDOM_SEED)
@@ -111,9 +112,9 @@ def main():
     log_dir = args.log_dir
 
     # setting optimizer
+    optim = args.optim
     batch_size = args.batch
-    # optim = args.optim
-    optim = 'sgd'
+    # optim = 'sgd'
     lr = args.lr
     lr_decay = args.lr_decay
     warmup_steps = args.warmup_steps
@@ -137,6 +138,7 @@ def main():
     max_comp = args.max_comp
     unk_replace = args.unk_replace
     normalize_weight = [args.tran_weight, args.input_weight, args.output_weight]
+    gaussian_decode = args.gaussian_decode
 
     EMISSION_CHO_GRAD = args.emission_cho_grad
     TRANSITION_CHO_GRAD = args.transition_cho_grad
@@ -152,7 +154,7 @@ def main():
     # logger = LOGGER
     logger.info(args)
 
-    device = torch.device('cuda') # if args.gpu else torch.device('cpu')
+    device = torch.device('cuda') if args.gpu else torch.device('cpu')
 
     # Loading data
     logger.info('Load PTB data....')
@@ -160,10 +162,8 @@ def main():
     train_path = os.path.join(root, 'train.conllu')
     dev_path = os.path.join(root, 'dev.conllu')
     test_path = os.path.join(root, 'test.conllu')
-    word_alphabet, char_alphabet, pos_alphabet, type_alphabet = conllx_data.create_alphabets(alphabet_path,
-                                                                                             train_path,
-                                                                                             data_paths=[dev_path,
-                                                                                                         test_path],
+    word_alphabet, char_alphabet, pos_alphabet, type_alphabet = conllx_data.create_alphabets(alphabet_path, train_path,
+                                                                                             data_paths=[dev_path, test_path],
                                                                                              embedd_dict=None,
                                                                                              max_vocabulary_size=1e5)
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
@@ -185,7 +185,7 @@ def main():
                                             t_mu_drop=t_mu_drop, t_cho_drop=t_cho_drop,
                                             out_mu_drop=out_mu_drop, out_cho_drop=out_cho_drop,
                                             i_comp_num=input_num_comp, t_comp_num=tran_num_comp,
-                                            o_comp_num=output_num_comp, max_comp=max_comp)
+                                            o_comp_num=output_num_comp, max_comp=max_comp, gaussian_decode=gaussian_decode)
 
     # model = RNNSequenceLabeling("LSTM", ntokens=ntokens, nlabels=nlabels, ninp=args.dim, nhid=args.dim, dropout=in_mu_drop)
     # model = WeightIOHMM(vocab_size=ntokens, nlabel=nlabels, num_state=100)
@@ -214,8 +214,8 @@ def main():
                 words, labels, masks = data['WORD'].to(device), data['POS'].to(device), data['MASK'].to(device)
 
                 # sentences, labels, masks, revert_order = standardize_batch(samples)
-                # loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight)
-                loss = model.get_loss(words, labels, masks)
+                loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight)
+                # loss = model.get_loss(words, labels, masks)
                 loss.backward()
                 optimizer.step()
                 scheduler.step()

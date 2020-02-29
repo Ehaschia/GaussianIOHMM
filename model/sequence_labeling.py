@@ -173,7 +173,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
                  t_cho_method='random', mu_embedding=None, var_embedding=None,
                  i_comp_num=1, t_comp_num=1, o_comp_num=1, max_comp=1,
                  in_mu_drop=0.0, in_cho_drop=0.0, out_mu_drop=0.0,
-                 out_cho_drop=0.0, t_mu_drop=0.0, t_cho_drop=0.0):
+                 out_cho_drop=0.0, t_mu_drop=0.0, t_cho_drop=0.0, gaussian_decode=True):
         super(MixtureGaussianSequenceLabeling, self).__init__()
 
         self.dim = dim
@@ -183,6 +183,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         self.t_comp_num = t_comp_num
         self.o_comp_num = o_comp_num
         self.max_comp = max_comp
+        self.gaussian_decode = gaussian_decode
         # parameter init
         self.input_mu_embedding = nn.Embedding(self.ntokens, self.i_comp_num * self.dim)
         self.input_cho_embedding = nn.Embedding(self.ntokens, self.i_comp_num * self.dim)
@@ -195,11 +196,23 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         self.trans_mu_dropout = nn.Dropout(t_mu_drop)
         self.trans_cho_dropout = nn.Dropout(t_cho_drop)
 
-        self.output_mu = Parameter(torch.empty(self.nlabels, self.o_comp_num * self.dim), requires_grad=True)
-        self.output_cho = Parameter(torch.empty(self.nlabels, self.o_comp_num * self.dim),
-                                    requires_grad=DECODE_CHO_GRAD)
-        self.output_mu_dropout = nn.Dropout(out_mu_drop)
-        self.output_cho_dropout = nn.Dropout(out_cho_drop)
+        # candidate decode method:
+        #   1. gaussian expected likelihood (the gaussian)
+        #   2. only use mu as input of a nn layer
+        #   3. consine distance
+        if gaussian_decode:
+            self.output_mu = Parameter(torch.empty(self.nlabels, self.o_comp_num * self.dim), requires_grad=True)
+            self.output_cho = Parameter(torch.empty(self.nlabels, self.o_comp_num * self.dim),
+                                        requires_grad=DECODE_CHO_GRAD)
+            self.output_mu_dropout = nn.Dropout(out_mu_drop)
+            self.output_cho_dropout = nn.Dropout(out_cho_drop)
+        else:
+            # here we only consider one vector per label
+            assert self.o_comp_num == 1
+            assert self.i_comp_num == 1
+            assert self.t_comp_num == 1
+            self.decode_layer = nn.Linear(self.dim, self.nlabels)
+            self.decode_dropout = nn.Dropout(out_mu_drop)
 
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
@@ -233,15 +246,19 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         else:
             raise ValueError("Error transition init method")
         # output mu init
-        if FAR_DECODE_MU:
-            nn.init.uniform_(self.output_mu, a=-1.0, b=1.0)
+        if self.gaussian_decode:
+            if FAR_DECODE_MU:
+                nn.init.uniform_(self.output_mu, a=-1.0, b=1.0)
+            else:
+                nn.init.xavier_normal_(self.output_mu)
+
+            # output var init
+            if output_cho_scale == 0:
+                nn.init.uniform_(self.output_cho, a=0.1, b=1.0)
+            else:
+                nn.init.constant_(self.output_cho, output_cho_scale)
         else:
-            nn.init.xavier_normal_(self.output_mu)
-        # output var init
-        if output_cho_scale == 0:
-            nn.init.uniform_(self.output_cho, a=0.1, b=1.0)
-        else:
-            nn.init.constant_(self.output_cho, output_cho_scale)
+            nn.init.xavier_normal_(self.decode_layer.weight)
 
     # just used for unit test
     def inject_parameter(self, in_mu, in_cho, tran_mu, tran_cho, out_mu, out_cho):
@@ -427,9 +444,6 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
         forward_input_var_mat = torch.diag_embed(forward_input_var_embedding).float()
 
-        output_mu = self.output_mu_dropout(self.output_mu)
-        output_var = torch.diag_embed(
-            self.output_cho_dropout(self.output_cho).reshape(self.nlabels, self.o_comp_num, self.dim) ** 2).float()
 
         forward_gaussian = self.cal_forward(batch, max_len, swapped_sentences, forward_input_mu_mat, forward_input_var_mat)
 
@@ -444,17 +458,23 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         expected_count_mus = torch.stack(expected_count_mu_holder, dim=1)
         expected_count_vars = torch.stack(expected_count_var_holder, dim=1)
 
-        # DEBUG debug the length here.
-        score, _, _ = gaussian_multi(expected_count_mus.view(batch, max_len, 1, -1, 1, self.dim),
-                                     output_mu.view(1, 1, self.nlabels, 1, self.o_comp_num, self.dim),
-                                     expected_count_vars.view(batch, max_len, 1, -1, 1, self.dim, self.dim),
-                                     output_var.view(1, 1, self.nlabels, 1, self.o_comp_num, self.dim, self.dim),
-                                     need_zeta=True)
+        if self.gaussian_decode:
+            output_mu = self.output_mu_dropout(self.output_mu)
+            output_var = torch.diag_embed(
+                self.output_cho_dropout(self.output_cho).reshape(self.nlabels, self.o_comp_num, self.dim) ** 2).float()
 
+            score, _, _ = gaussian_multi(expected_count_mus.view(batch, max_len, 1, -1, 1, self.dim),
+                                         output_mu.view(1, 1, self.nlabels, 1, self.o_comp_num, self.dim),
+                                         expected_count_vars.view(batch, max_len, 1, -1, 1, self.dim, self.dim),
+                                         output_var.view(1, 1, self.nlabels, 1, self.o_comp_num, self.dim, self.dim),
+                                         need_zeta=True)
+            real_score = torch.logsumexp(
+                (score + expected_count_scores.view(batch, max_len, 1, -1, 1)).view(batch, max_len, self.nlabels, -1),
+                dim=-1)
+        else:
+            # thus only one gaussian in this method, expected_count_scores is all same
+            real_score = self.decode_dropout(self.decode_layer(expected_count_mus.view(batch*max_len, -1))).view(batch, max_len, self.nlabels)
         # shape [batch, len-1, vocab_size]
-        real_score = torch.logsumexp(
-            (score + expected_count_scores.view(batch, max_len, 1, -1, 1)).view(batch, max_len, self.nlabels, -1),
-            dim=-1)
         return real_score
 
     def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor,
@@ -467,9 +487,12 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         trans_reg = torch.mean(InvWishart.logpdf(trans_cho, 2*self.dim, (4*self.dim+1) * torch.eye(2*self.dim)))
         in_cho = torch.diag_embed(self.input_cho_embedding.weight).float()
         in_reg = torch.mean(InvWishart.logpdf(in_cho, self.dim, (2*self.dim+1) * torch.eye(self.dim)))
-        out_cho = torch.diag_embed(self.output_cho)
-        out_reg = torch.mean(InvWishart.logpdf(out_cho, self.dim, (2*self.dim+1) * torch.eye(self.dim)))
-        reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg + normalize_weight[2] * out_reg
+        if self.gaussian_decode:
+            out_cho = torch.diag_embed(self.output_cho)
+            out_reg = torch.mean(InvWishart.logpdf(out_cho, self.dim, (2*self.dim+1) * torch.eye(self.dim)))
+            reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg + normalize_weight[2] * out_reg
+        else:
+            reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg
 
         return (torch.sum(prob) - reg) / sentences.size(0)
 
