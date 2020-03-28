@@ -5,12 +5,9 @@ import numpy as np
 import torch.nn.functional as F
 
 
-def reset_embedding(init_embedding, embedding_layer, embedding_dim, trainable, far_init, var=False):
+def reset_embedding(init_embedding, embedding_layer, embedding_dim, trainable, var=False):
     if init_embedding is None:
-        if far_init:
-            scale = 1.0
-        else:
-            scale = np.sqrt(3.0 / embedding_dim)
+        scale = np.sqrt(3.0 / embedding_dim)
         if var:
             embedding_layer.weight.data.uniform_(-scale, scale)
         else:

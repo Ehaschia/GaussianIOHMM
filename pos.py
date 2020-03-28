@@ -56,11 +56,11 @@ def main():
         default='./dataset/ptb/',
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=256)
-    parser.add_argument('--optim', choices=['sgd', 'adam'], default='adam')
+    parser.add_argument('--optim', choices=['sgd', 'adam'], default='sgd')
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--lr_decay', type=float, default=0.999995, help='Decay rate of learning rate')
     parser.add_argument('--amsgrad', action='store_true', help='AMD Grad')
-    parser.add_argument('--weight_decay', type=float, default=0.0, help='weight for l2 norm decay')
+    parser.add_argument('--weight_decay', type=float, default=0.001, help='weight for l2 norm decay')
     parser.add_argument('--warmup_steps', type=int, default=0, metavar='N',
                         help='number of steps to warm up (default: 0)')
     parser.add_argument('--var_scale', type=float, default=1.0)
@@ -98,12 +98,9 @@ def main():
     parser.add_argument('--emission_cho_grad', type=bool, default=False)
     parser.add_argument('--transition_cho_grad', type=bool, default=True)
     parser.add_argument('--decode_cho_grad', type=bool, default=False)
-    parser.add_argument('--gaussian_decode', action='store_false')
+    parser.add_argument('--gaussian_decode', action='store_true')
 
     args = parser.parse_args()
-    # np.random.seed(global_variables.RANDOM_SEED)
-    # torch.manual_seed(global_variables.RANDOM_SEED)
-    # random.seed(global_variables.RANDOM_SEED)
 
     np.random.seed(args.random_seed)
     torch.manual_seed(args.random_seed)
@@ -150,7 +147,7 @@ def main():
     save_parameter_to_json(log_dir, vars(args))
 
     logger = get_logger('Sequence-Labeling')
-    change_handler(logger, log_dir)
+    # change_handler(logger, log_dir)
     # logger = LOGGER
     logger.info(args)
 
@@ -165,18 +162,21 @@ def main():
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = conllx_data.create_alphabets(alphabet_path, train_path,
                                                                                              data_paths=[dev_path, test_path],
                                                                                              embedd_dict=None,
-                                                                                             max_vocabulary_size=1e5)
-    logger.info("Word Alphabet Size: %d" % word_alphabet.size())
-    logger.info("Character Alphabet Size: %d" % char_alphabet.size())
-    logger.info("POS Alphabet Size: %d" % pos_alphabet.size())
-    ntokens = word_alphabet.size()
-    nlabels = pos_alphabet.size()
+                                                                                             max_vocabulary_size=1e5,
+                                                                                             min_occurrence=1)
 
     train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet,
                                                    type_alphabet)
     num_data = sum(train_dataset[1])
     dev_dataset = conllx_data.read_data(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
     test_dataset = conllx_data.read_data(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
+
+    logger.info("Word Alphabet Size: %d" % word_alphabet.size())
+    logger.info("Character Alphabet Size: %d" % char_alphabet.size())
+    logger.info("POS Alphabet Size: %d" % pos_alphabet.size())
+    ntokens = word_alphabet.size()
+    nlabels = pos_alphabet.size()
+
     # build model
     model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels,
                                             t_cho_method=tran_cho_method, t_cho_init=trans_cho_init,
@@ -254,7 +254,7 @@ def main():
                     "Test ACC: " + str(round(best_epoch[2] * 100, 3)))
         return best_epoch
 
-    best_epoch = train(best_epoch, thread=50)
+    best_epoch = train(best_epoch, thread=10)
     # logger.info("After tunning mu. Here we tunning variance")
     # # flip gradient
     #

@@ -8,7 +8,7 @@ import torch
 from io_module.reader import CoNLLXReader
 from io_module.alphabet import Alphabet
 from io_module.logger import get_logger
-from io_module.common import DIGIT_RE, MAX_CHAR_LENGTH, UNK_ID
+from io_module.common import DIGIT_RE, MAX_CHAR_LENGTH
 from io_module.common import PAD_CHAR, PAD, PAD_POS, PAD_TYPE, PAD_ID_CHAR, PAD_ID_TAG, PAD_ID_WORD
 from io_module.common import ROOT, END, ROOT_CHAR, ROOT_POS, ROOT_TYPE, END_CHAR, END_POS, END_TYPE
 
@@ -48,8 +48,8 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
                         vocab_list.append(word)
 
     logger = get_logger("Create Alphabets")
-    word_alphabet = Alphabet('word', defualt_value=True, singleton=True)
-    char_alphabet = Alphabet('character', defualt_value=True)
+    word_alphabet = Alphabet('word', singleton=True)
+    char_alphabet = Alphabet('character')
     pos_alphabet = Alphabet('pos')
     type_alphabet = Alphabet('type')
     if not os.path.isdir(alphabet_directory):
@@ -100,8 +100,8 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
         vocab_list = _START_VOCAB + sorted(vocab, key=vocab.get, reverse=True)
         logger.info("Total Vocabulary Size: %d" % len(vocab_list))
         logger.info("Total Singleton Size:  %d" % len(singletons))
-        vocab_list = [word for word in vocab_list if word in _START_VOCAB or vocab[word] > min_occurrence]
-        logger.info("Total Vocabulary Size (w.o rare words): %d" % len(vocab_list))
+        multi_vocab = [word for word in vocab_list if word in _START_VOCAB or vocab[word] > min_occurrence]
+        logger.info("Total Vocabulary Size (w.o rare words): %d" % len(multi_vocab))
 
         if len(vocab_list) > max_vocabulary_size:
             vocab_list = vocab_list[:max_vocabulary_size]
@@ -110,9 +110,12 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
             expand_vocab()
 
         for word in vocab_list:
-            word_alphabet.add(word)
-            if word in singletons:
+            if word in multi_vocab:
+                word_alphabet.add(word)
+            elif word in singletons:
                 word_alphabet.add_singleton(word_alphabet.get_index(word))
+            else:
+                raise ValueError("Error word: " + word)
 
         word_alphabet.save(alphabet_directory)
         char_alphabet.save(alphabet_directory)

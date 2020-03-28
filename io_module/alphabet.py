@@ -1,4 +1,4 @@
-__author__ = 'max'
+__author__ = 'Ehaschia'
 
 """
 Alphabet maps objects to integer ids. It provides two way mapping from the index to the objects.
@@ -9,28 +9,20 @@ from io_module.logger import get_logger
 
 
 class Alphabet(object):
-    def __init__(self, name, defualt_value=False, keep_growing=True, singleton=False):
+    def __init__(self, name, keep_growing=True, singleton=False):
         self.__name = name
 
         self.instance2index = {}
         self.instances = []
-        self.default_value = defualt_value
-        self.offset = 1 if self.default_value else 0
         self.keep_growing = keep_growing
         self.singletons = set() if singleton else None
-
-        # Index 0 is occupied by default, all else following.
-        self.default_index = 0 if self.default_value else None
-
-        self.next_index = self.offset
 
         self.logger = get_logger('Alphabet')
 
     def add(self, instance):
         if instance not in self.instance2index:
+            self.instance2index[instance] = len(self.instances)
             self.instances.append(instance)
-            self.instance2index[instance] = self.next_index
-            self.next_index += 1
 
     def add_singleton(self, id):
         if self.singletons is None:
@@ -51,31 +43,35 @@ class Alphabet(object):
             return id in self.singletons
 
     def get_index(self, instance):
-        try:
+        # try:
+        #     return self.instance2index[instance]
+        # except KeyError:
+        #     if self.keep_growing:
+        #         index = len(self.instances)
+        #         self.add(instance)
+        #         return index
+        #     else:
+        #         raise KeyError("instance not found: %s" % instance)
+        if instance in self.instance2index:
             return self.instance2index[instance]
-        except KeyError:
-            if self.keep_growing:
-                index = self.next_index
-                self.add(instance)
-                return index
-            else:
-                if self.default_value:
-                    return self.default_index
-                else:
-                    raise KeyError("instance not found: %s" % instance)
+        elif self.keep_growing:
+            index = len(self.instances)
+            self.add(instance)
+            return index
+        else:
+            return -1
+
+    def is_known(self, instance):
+        return instance in self.instance2index
 
     def get_instance(self, index):
-        if self.default_value and index == self.default_index:
-            # First index is occupied by the wildcard element.
-            return '<_UNK>'
-        else:
-            try:
-                return self.instances[index - self.offset]
-            except IndexError:
-                raise IndexError('unknown index: %d' % index)
+        try:
+            return self.instances[index]
+        except IndexError:
+            raise IndexError('unknown index: %d' % index)
 
     def size(self):
-        return len(self.instances) + self.offset
+        return len(self.instances)
 
     def singleton_size(self):
         return len(self.singletons)
@@ -84,9 +80,9 @@ class Alphabet(object):
         return self.instance2index.items()
 
     def enumerate_items(self, start):
-        if start < self.offset or start >= self.size():
-            raise IndexError("Enumerate is allowed between [%d : size of the alphabet)" % self.offset)
-        return zip(range(start, len(self.instances) + self.offset), self.instances[start - self.offset:])
+        if start >= self.size():
+            raise IndexError("Enumerate is allowed between [0 : size of the alphabet)")
+        return zip(range(start, len(self.instances)), self.instances[start:])
 
     def close(self):
         self.keep_growing = False
@@ -135,5 +131,4 @@ class Alphabet(object):
         """
         loading_name = name if name else self.__name
         self.__from_json(json.load(open(os.path.join(input_directory, loading_name + ".json"))))
-        self.next_index = len(self.instances) + self.offset
         self.keep_growing = False

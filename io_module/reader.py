@@ -4,15 +4,19 @@ from io_module.instance import DependencyInstance, NERInstance
 from io_module.instance import Sentence
 from io_module.common import ROOT, ROOT_POS, ROOT_CHAR, ROOT_TYPE, END, END_POS, END_CHAR, END_TYPE
 from io_module.common import DIGIT_RE, MAX_CHAR_LENGTH
+from io_module.refine_unknown import UNKRefiner
 
 
 class CoNLLXReader(object):
-    def __init__(self, file_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet):
+    def __init__(self, file_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet, refine_unk=True):
         self.__source_file = open(file_path, 'r')
         self.__word_alphabet = word_alphabet
         self.__char_alphabet = char_alphabet
         self.__pos_alphabet = pos_alphabet
         self.__type_alphabet = type_alphabet
+        self.refine_unk = refine_unk
+        if self.refine_unk:
+            self.refiner = UNKRefiner(0, self.__word_alphabet)
 
     def close(self):
         self.__source_file.close()
@@ -74,7 +78,7 @@ class CoNLLXReader(object):
             type = tokens[7]
 
             words.append(word)
-            word_ids.append(self.__word_alphabet.get_index(word))
+            # word_ids.append(self.__word_alphabet.get_index(word))
 
             postags.append(pos)
             pos_ids.append(self.__pos_alphabet.get_index(pos))
@@ -94,6 +98,19 @@ class CoNLLXReader(object):
             types.append(END_TYPE)
             type_ids.append(self.__type_alphabet.get_index(END_TYPE))
             heads.append(0)
+
+        for position, word in enumerate(words):
+            if self.refine_unk:
+                word_idx = self.__word_alphabet.get_index(word)
+                if word_idx < 0:
+                    unk_signature = self.refiner.refine(word, position)
+                    self.__word_alphabet.add(unk_signature)
+                    idx = self.__word_alphabet.get_index(unk_signature)
+                    word_ids.append(self.__word_alphabet.get_index(unk_signature))
+                else:
+                    word_ids.append(self.__word_alphabet.get_index(word))
+            else:
+                word_ids.append(self.__word_alphabet.get_index(word))
 
         return DependencyInstance(Sentence(words, word_ids, char_seqs, char_id_seqs), postags, pos_ids, heads, types, type_ids)
 

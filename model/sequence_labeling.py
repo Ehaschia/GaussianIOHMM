@@ -28,19 +28,14 @@ class GaussianSequenceLabeling(nn.Module):
 
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
-        reset_embedding(mu_embedding, self.emission_mu_embedding, self.dim, True,
-                        far_init=FAR_EMISSION_MU)
-        reset_embedding(var_embedding, self.emission_cho_embedding, self.dim, EMISSION_CHO_GRAD,
-                        far_init=False, var=True)
+        reset_embedding(mu_embedding, self.emission_mu_embedding, self.dim, True)
+        reset_embedding(var_embedding, self.emission_cho_embedding, self.dim, EMISSION_CHO_GRAD, var=True)
         self.reset_parameter(init_var_scale)
 
     def reset_parameter(self, init_var_scale):
-        if FAR_TRANSITION_MU:
-            nn.init.uniform_(self.transition_mu, a=-1.0, b=1.0)
-        else:
-            to_init_transition_mu = self.transition_mu.unsqueeze(0)
-            nn.init.xavier_normal_(to_init_transition_mu)
-            self.transition_mu.data = to_init_transition_mu.squeeze(0)
+        to_init_transition_mu = self.transition_mu.unsqueeze(0)
+        nn.init.xavier_normal_(to_init_transition_mu)
+        self.transition_mu.data = to_init_transition_mu.squeeze(0)
         # here the init of var should be alert
         nn.init.uniform_(self.transition_cho)
         weight = self.transition_cho.data - 0.5
@@ -48,10 +43,8 @@ class GaussianSequenceLabeling(nn.Module):
         weight = torch.tril(weight)
         # weight = self.atma(weight)
         self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
-        if FAR_DECODE_MU:
-            nn.init.uniform_(self.decoder_mu, a=-1.0, b=1.0)
-        else:
-            nn.init.xavier_normal_(self.decoder_mu)
+
+        nn.init.xavier_normal_(self.decoder_mu)
         nn.init.uniform_(self.decoder_cho)
 
     def forward(self, sentences: torch.Tensor, backward_order: torch.Tensor) -> torch.Tensor:
@@ -216,23 +209,20 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
-        reset_embedding(mu_embedding, self.input_mu_embedding, self.dim, True, far_init=FAR_EMISSION_MU)
+        reset_embedding(mu_embedding, self.input_mu_embedding, self.dim, True)
 
         # init the var
         if in_cho_init != 0:
             var_embedding = torch.empty(self.ntokens, self.i_comp_num * self.dim)
             nn.init.constant_(var_embedding, in_cho_init)
-        reset_embedding(var_embedding, self.input_cho_embedding, self.dim, EMISSION_CHO_GRAD, far_init=False)
+        reset_embedding(var_embedding, self.input_cho_embedding, self.dim, EMISSION_CHO_GRAD)
         self.reset_parameter(trans_cho_method=t_cho_method, output_cho_scale=out_cho_init, t_cho_scale=t_cho_init)
 
     def reset_parameter(self, trans_cho_method='random', output_cho_scale=0, t_cho_scale=0):
         # transition mu init
-        if FAR_TRANSITION_MU:
-            nn.init.uniform_(self.transition_mu, a=-1.0, b=1.0)
-        else:
-            to_init_transition_mu = self.transition_mu.unsqueeze(0)
-            nn.init.xavier_normal_(to_init_transition_mu)
-            self.transition_mu.data = to_init_transition_mu.squeeze(0)
+        to_init_transition_mu = self.transition_mu.unsqueeze(0)
+        nn.init.xavier_normal_(to_init_transition_mu)
+        self.transition_mu.data = to_init_transition_mu.squeeze(0)
         # transition var init
         if trans_cho_method == 'random':
             nn.init.uniform_(self.transition_cho)
@@ -247,10 +237,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
             raise ValueError("Error transition init method")
         # output mu init
         if self.gaussian_decode:
-            if FAR_DECODE_MU:
-                nn.init.uniform_(self.output_mu, a=-1.0, b=1.0)
-            else:
-                nn.init.xavier_normal_(self.output_mu)
+            nn.init.xavier_normal_(self.output_mu)
 
             # output var init
             if output_cho_scale == 0:
