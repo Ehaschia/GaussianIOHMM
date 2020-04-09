@@ -470,13 +470,20 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels) * masks
         # the loss format can fine tune. According to zechuan's investigation.
         # here our gaussian only trans is non-diagonal. Thus this regularization only suit trans.
-        trans_cho = self.transition_cho.view(1, 2*self.dim, 2*self.dim)
+        batch, max_len = sentences.size()
+        trans_cho = self.transition_cho.view(-1, 2*self.dim, 2*self.dim)
         trans_reg = torch.mean(InvWishart.logpdf(trans_cho, 2*self.dim, (4*self.dim+1) * torch.eye(2*self.dim)))
-        in_cho = torch.diag_embed(self.input_cho_embedding.weight).float()
-        in_reg = torch.mean(InvWishart.logpdf(in_cho, self.dim, (2*self.dim+1) * torch.eye(self.dim)))
+        if self.input_cho_embedding.weight.requires_grad:
+            in_cho = torch.diag_embed(self.input_cho_embedding.weight.reshape(-1, self.i_comp_num, self.dim)).float()
+            in_reg = torch.mean(InvWishart.logpdf(in_cho, self.dim, (2*self.dim+1) * torch.eye(self.dim)))
+        else:
+            in_reg = 0.0
         if self.gaussian_decode:
-            out_cho = torch.diag_embed(self.output_cho)
-            out_reg = torch.mean(InvWishart.logpdf(out_cho, self.dim, (2*self.dim+1) * torch.eye(self.dim)))
+            if self.output_cho.requires_grad:
+                out_cho = torch.diag_embed(self.output_cho.reshape(self.nlabels, self.o_comp_num, self.dim))
+                out_reg = torch.mean(InvWishart.logpdf(out_cho, self.dim, (2*self.dim+1) * torch.eye(self.dim)))
+            else:
+                out_reg = 0.0
             reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg + normalize_weight[2] * out_reg
         else:
             reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg
