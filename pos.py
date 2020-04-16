@@ -11,7 +11,7 @@ from io_module.logger import *
 from io_module.utils import iterate_data
 from model.sequence_labeling import *
 from model.weighted_iohmm import WeightIOHMM
-from misc.sharp_detect import SharpDetector
+# from misc.sharp_detect import SharpDetector
 from optim.lr_scheduler import ExponentialScheduler
 
 
@@ -22,9 +22,9 @@ def evaluate(data, batch, model, device):
     with torch.no_grad():
         for batch_data in iterate_data(data, batch):
             # sentences, labels, masks, revert_order = standardize_batch(data[i * batch: (i + 1) * batch])
-            words = batch_data['WORD'].to(device)
-            labels = batch_data['POS'].to(device)
-            masks = batch_data['MASK'].to(device)
+            words = batch_data['WORD'].squeeze().to(device)
+            labels = batch_data['POS'].squeeze().to(device)
+            masks = batch_data['MASK'].squeeze().to(device)
             acc, corr = model.get_acc(words, labels, masks)
             corr_token_num += corr
             total_token_num += torch.sum(masks).item()
@@ -66,7 +66,7 @@ def main():
     parser.add_argument('--var_scale', type=float, default=1.0)
     parser.add_argument('--log_dir', type=str,
                         default='./output/' + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + "/")
-    parser.add_argument('--dim', type=int, default=10)
+    parser.add_argument('--dim', type=int, default=5)
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
     parser.add_argument('--in_mu_drop', type=float, default=0.0)
@@ -83,14 +83,14 @@ def main():
     parser.add_argument('--output_cho_init', type=float, default=0.0,
                         help='init method of output cholesky matrix. 0 means random. The other score means constant')
     # i_comp_num = 1, t_comp_num = 1, o_comp_num = 1, max_comp = 1,
-    parser.add_argument('--input_comp_num', type=int, default=1,
+    parser.add_argument('--input_comp_num', type=int, default=2,
                         help='input mixture gaussian component number')
     parser.add_argument('--tran_comp_num', type=int, default=1,
                         help='transition mixture gaussian component number')
     parser.add_argument('--output_comp_num', type=int, default=1,
                         help='output mixture gaussian component number')
-    parser.add_argument('--max_comp', type=int, default=1,
-                        help='number of max number of component')
+    parser.add_argument('--threshold', type=float, default=0.1,
+                        help='pruning hyper-parameter, greater than 1 is max component, less than 1 is max value')
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
     parser.add_argument('--tran_weight', type=float, default=0.0001)
     parser.add_argument('--input_weight', type=float, default=0.0)
@@ -132,7 +132,7 @@ def main():
     input_num_comp = args.input_comp_num
     tran_num_comp = args.tran_comp_num
     output_num_comp = args.output_comp_num
-    max_comp = args.max_comp
+    threshold = args.threshold
     unk_replace = args.unk_replace
     normalize_weight = [args.tran_weight, args.input_weight, args.output_weight]
     gaussian_decode = args.gaussian_decode
@@ -178,14 +178,26 @@ def main():
     nlabels = pos_alphabet.size()
 
     # build model
-    model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels,
-                                            t_cho_method=tran_cho_method, t_cho_init=trans_cho_init,
-                                            in_cho_init=input_cho_init, out_cho_init=output_cho_init,
-                                            in_mu_drop=in_mu_drop, in_cho_drop=in_cho_drop,
-                                            t_mu_drop=t_mu_drop, t_cho_drop=t_cho_drop,
-                                            out_mu_drop=out_mu_drop, out_cho_drop=out_cho_drop,
-                                            i_comp_num=input_num_comp, t_comp_num=tran_num_comp,
-                                            o_comp_num=output_num_comp, max_comp=max_comp, gaussian_decode=gaussian_decode)
+    if threshold >= 1.0:
+        model = MixtureGaussianSequenceLabeling(dim=args.dim, ntokens=ntokens, nlabels=nlabels,
+                                                t_cho_method=tran_cho_method, t_cho_init=trans_cho_init,
+                                                in_cho_init=input_cho_init, out_cho_init=output_cho_init,
+                                                in_mu_drop=in_mu_drop, in_cho_drop=in_cho_drop,
+                                                t_mu_drop=t_mu_drop, t_cho_drop=t_cho_drop,
+                                                out_mu_drop=out_mu_drop, out_cho_drop=out_cho_drop,
+                                                i_comp_num=input_num_comp, t_comp_num=tran_num_comp,
+                                                o_comp_num=output_num_comp, max_comp=int(threshold),
+                                                gaussian_decode=gaussian_decode)
+    else:
+        model = ThresholdPruningMGSL(dim=args.dim, ntokens=ntokens, nlabels=nlabels,
+                                     t_cho_method=tran_cho_method, t_cho_init=trans_cho_init,
+                                     in_cho_init=input_cho_init, out_cho_init=output_cho_init,
+                                     in_mu_drop=in_mu_drop, in_cho_drop=in_cho_drop,
+                                     t_mu_drop=t_mu_drop, t_cho_drop=t_cho_drop,
+                                     out_mu_drop=out_mu_drop, out_cho_drop=out_cho_drop,
+                                     i_comp_num=input_num_comp, t_comp_num=tran_num_comp,
+                                     o_comp_num=output_num_comp, threshold=threshold,
+                                     gaussian_decode=gaussian_decode)
 
     # model = RNNSequenceLabeling("LSTM", ntokens=ntokens, nlabels=nlabels, ninp=args.dim, nhid=args.dim, dropout=in_mu_drop)
     # model = WeightIOHMM(vocab_size=ntokens, nlabel=nlabels, num_state=100)
@@ -212,9 +224,13 @@ def main():
                 optimizer.zero_grad()
                 # samples = train_dataset[j * batch_size: (j + 1) * batch_size]
                 words, labels, masks = data['WORD'].to(device), data['POS'].to(device), data['MASK'].to(device)
-
-                # sentences, labels, masks, revert_order = standardize_batch(samples)
-                loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight)
+                loss = 0.0
+                if threshold >= 1.0:
+                    # sentences, labels, masks, revert_order = standardize_batch(samples)
+                    loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight)
+                else:
+                    for i in range(batch_size):
+                        loss += model.get_loss(words[i], labels[i], masks[i], normalize_weight=normalize_weight)
                 # loss = model.get_loss(words, labels, masks)
                 loss.backward()
                 optimizer.step()
@@ -235,7 +251,10 @@ def main():
                     sys.stdout.flush()
                     num_back = len(log_info)
             logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / num_insts, 4)))
-            acc, corr = evaluate(dev_dataset, batch_size, model, device)
+            if threshold >= 1.0:
+                acc, corr = evaluate(dev_dataset, batch_size, model, device)
+            else:
+                acc, corr = evaluate(dev_dataset, 1, model, device)
             logger.info('\t Dev Acc: ' + str(round(acc * 100, 3)))
             if best_epoch[1] < acc:
                 test_acc, _ = evaluate(test_dataset, batch_size, model, device)

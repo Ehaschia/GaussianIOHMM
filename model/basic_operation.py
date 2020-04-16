@@ -286,3 +286,25 @@ def gaussian_top_k_pruning(score, mu, var, k=1):
     pruned_mu = torch.gather(mu, 1, index.view(batch, -1, 1).repeat(1, 1, dim))
     pruned_var = torch.gather(var, 1, index.view(batch, -1, 1, 1).repeat(1, 1, dim, dim))
     return pruned_score, pruned_mu, pruned_var
+
+# here we consider pruning mixture gaussian by score.
+# alert here has not batch
+# If the score of current gaussian is smaller than max_score + k, pruning it
+# max component should be 100
+def gaussian_max_k_pruning(score, mu, var, k=-2.3):
+    dim = mu.size()[-1]
+    max_score, max_index = torch.max(score, dim=0)
+    threshold_score = max_score + k
+    mask = torch.gt(score, threshold_score)
+    pruned_score = torch.masked_select(score, mask)
+    pruned_mu = torch.masked_select(mu, mask.view(-1, 1).repeat(1, dim)).view(-1, dim)
+    pruned_var = torch.masked_select(var, mask.view(-1, 1, 1).repeat(1, dim, dim)).view(-1, dim, dim)
+
+    if pruned_score.size()[0] > 100:
+        pruned_score_v2, index = torch.topk(pruned_score, 100, dim=-1)
+        pruned_mu_v2 = torch.gather(pruned_mu, 0, index.view(-1, 1).repeat(1, dim))
+        pruned_var_v2 = torch.gather(pruned_var, 0, index.view(-1, 1, 1).repeat(1, dim, dim))
+        return pruned_score_v2, pruned_mu_v2, pruned_var_v2
+    else:
+        return pruned_score, pruned_mu, pruned_var
+

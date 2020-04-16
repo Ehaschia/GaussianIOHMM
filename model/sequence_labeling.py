@@ -230,7 +230,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
             weight = torch.tril(weight)
             self.transition_cho.data = weight + t_cho_scale * torch.eye(2 * self.dim)
         elif trans_cho_method == 'wishart':
-            transition_var = invwishart.rvs(2 * self.dim, (4*self.dim+1) * np.eye(2 * self.dim),
+            transition_var = invwishart.rvs(2 * self.dim, (4 * self.dim + 1) * np.eye(2 * self.dim),
                                             size=self.t_comp_num, random_state=None)
             self.transition_cho.data = torch.from_numpy(np.linalg.cholesky(transition_var)).float()
         else:
@@ -268,7 +268,8 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         # shape [batch, pre_comp, trans_comp, dim, dim]
         init_mu = torch.zeros(batch, 1, 1, self.dim, requires_grad=False).to(swapped_sentences.device)
         init_var = torch.eye(self.dim,
-                             requires_grad=False).repeat(batch, 1, 1).unsqueeze(1).unsqueeze(1).to(swapped_sentences.device)
+                             requires_grad=False).repeat(batch, 1, 1).unsqueeze(1).unsqueeze(1).to(
+            swapped_sentences.device)
 
         part_score, part_mu, part_var = gaussian_multi_integral(trans_mu, init_mu, trans_var,
                                                                 init_var, need_zeta=True, forward=True)
@@ -317,15 +318,21 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
         init_mu = torch.zeros(batch, 1, 1, self.dim, requires_grad=False).to(swapped_sentences.device)
         init_var = torch.eye(self.dim,
-                             requires_grad=False).repeat(batch, 1, 1).unsqueeze(1).unsqueeze(1).to(swapped_sentences.device)
+                             requires_grad=False).repeat(batch, 1, 1).unsqueeze(1).unsqueeze(1).to(
+            swapped_sentences.device)
 
         trans_mu = self.trans_mu_dropout(self.transition_mu).reshape(1, 1, self.t_comp_num, 2 * self.dim)
-        trans_var = atma(self.trans_cho_dropout(self.transition_cho)).reshape(1, 1, self.t_comp_num, 2 * self.dim, 2 * self.dim)
+        trans_var = atma(self.trans_cho_dropout(self.transition_cho)).reshape(1, 1, self.t_comp_num, 2 * self.dim,
+                                                                              2 * self.dim)
 
-        part_score, part_mu, part_var = gaussian_multi_integral(trans_mu, init_mu, trans_var, init_var, need_zeta=True, forward=False)
+        part_score, part_mu, part_var = gaussian_multi_integral(trans_mu, init_mu, trans_var, init_var, need_zeta=True,
+                                                                forward=False)
         backward_prev_score, backward_prev_mu, backward_prev_var = gaussian_top_k_pruning(part_score.view(batch, -1),
-                                                                                          part_mu.view(batch, -1, self.dim),
-                                                                                          part_var.view(batch, -1, self.dim, self.dim),
+                                                                                          part_mu.view(batch, -1,
+                                                                                                       self.dim),
+                                                                                          part_var.view(batch, -1,
+                                                                                                        self.dim,
+                                                                                                        self.dim),
                                                                                           k=self.max_comp)
 
         backward_holder_score = [backward_prev_score]
@@ -347,7 +354,8 @@ class MixtureGaussianSequenceLabeling(nn.Module):
                                                                     backward_var.view(batch, -1, 1, self.dim, self.dim),
                                                                     need_zeta=True, forward=False)
 
-            real_backward_score = (backward_score + backward_prev_score.view(batch, -1, 1)).reshape(batch, -1, 1) + part_score
+            real_backward_score = (backward_score + backward_prev_score.view(batch, -1, 1)).reshape(batch, -1,
+                                                                                                    1) + part_score
 
             # pruning
             backward_prev_score, backward_prev_mu, backward_prev_var = gaussian_top_k_pruning(
@@ -425,20 +433,22 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         forward_input_mu_mat = self.input_mu_dropout(self.input_mu_embedding(swapped_sentences).
                                                      reshape(max_len, batch, self.i_comp_num, self.dim))
         forward_input_var_embedding = (
-                    self.input_cho_dropout(
-                        self.input_cho_embedding(
-                            swapped_sentences)) ** 2).reshape(max_len, batch, self.i_comp_num, self.dim)
+                self.input_cho_dropout(
+                    self.input_cho_embedding(
+                        swapped_sentences)) ** 2).reshape(max_len, batch, self.i_comp_num, self.dim)
 
         forward_input_var_mat = torch.diag_embed(forward_input_var_embedding).float()
 
-
-        forward_gaussian = self.cal_forward(batch, max_len, swapped_sentences, forward_input_mu_mat, forward_input_var_mat)
+        forward_gaussian = self.cal_forward(batch, max_len, swapped_sentences, forward_input_mu_mat,
+                                            forward_input_var_mat)
 
         backward_input_mu_mat = torch.flip(forward_input_mu_mat, dims=[0])
         backward_input_var_mat = torch.flip(forward_input_var_mat, dims=[0])
-        backward_gaussian = self.cal_backward(batch, max_len, swapped_sentences, backward_input_mu_mat, backward_input_var_mat)
+        backward_gaussian = self.cal_backward(batch, max_len, swapped_sentences, backward_input_mu_mat,
+                                              backward_input_var_mat)
 
-        expected_count_score_holder, expected_count_mu_holder, expected_count_var_holder = self.cal_expected_count(batch, max_len, forward_gaussian, backward_gaussian, forward_input_mu_mat, forward_input_var_mat)
+        expected_count_score_holder, expected_count_mu_holder, expected_count_var_holder = self.cal_expected_count(
+            batch, max_len, forward_gaussian, backward_gaussian, forward_input_mu_mat, forward_input_var_mat)
 
         # shape [batch, length, comp, dim, dim]
         expected_count_scores = torch.stack(expected_count_score_holder, dim=1)
@@ -460,7 +470,8 @@ class MixtureGaussianSequenceLabeling(nn.Module):
                 dim=-1)
         else:
             # thus only one gaussian in this method, expected_count_scores is all same
-            real_score = self.decode_dropout(self.decode_layer(expected_count_mus.view(batch*max_len, -1))).view(batch, max_len, self.nlabels)
+            real_score = self.decode_dropout(self.decode_layer(expected_count_mus.view(batch * max_len, -1))).view(
+                batch, max_len, self.nlabels)
         # shape [batch, len-1, vocab_size]
         return real_score
 
@@ -470,18 +481,17 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels) * masks
         # the loss format can fine tune. According to zechuan's investigation.
         # here our gaussian only trans is non-diagonal. Thus this regularization only suit trans.
-        batch, max_len = sentences.size()
-        trans_cho = self.transition_cho.view(-1, 2*self.dim, 2*self.dim)
-        trans_reg = torch.mean(InvWishart.logpdf(trans_cho, 2*self.dim, (4*self.dim+1) * torch.eye(2*self.dim)))
+        trans_cho = self.transition_cho.view(-1, 2 * self.dim, 2 * self.dim)
+        trans_reg = torch.mean(InvWishart.logpdf(trans_cho, 2 * self.dim, (4 * self.dim + 1) * torch.eye(2 * self.dim)))
         if self.input_cho_embedding.weight.requires_grad:
             in_cho = torch.diag_embed(self.input_cho_embedding.weight.reshape(-1, self.i_comp_num, self.dim)).float()
-            in_reg = torch.mean(InvWishart.logpdf(in_cho, self.dim, (2*self.dim+1) * torch.eye(self.dim)))
+            in_reg = torch.mean(InvWishart.logpdf(in_cho, self.dim, (2 * self.dim + 1) * torch.eye(self.dim)))
         else:
             in_reg = 0.0
         if self.gaussian_decode:
             if self.output_cho.requires_grad:
                 out_cho = torch.diag_embed(self.output_cho.reshape(self.nlabels, self.o_comp_num, self.dim))
-                out_reg = torch.mean(InvWishart.logpdf(out_cho, self.dim, (2*self.dim+1) * torch.eye(self.dim)))
+                out_reg = torch.mean(InvWishart.logpdf(out_cho, self.dim, (2 * self.dim + 1) * torch.eye(self.dim)))
             else:
                 out_reg = 0.0
             reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg + normalize_weight[2] * out_reg
@@ -489,6 +499,318 @@ class MixtureGaussianSequenceLabeling(nn.Module):
             reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg
 
         return (torch.sum(prob) - reg) / sentences.size(0)
+
+    def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor,
+                masks: torch.Tensor) -> Tuple:
+        real_score = self.forward(sentences)
+        pred = torch.argmax(real_score, dim=-1).cpu().numpy()
+        corr = np.sum(np.equal(pred, labels.cpu().numpy()) * masks.cpu().numpy())
+        total = np.sum(masks.cpu().numpy())
+        return corr / total, corr
+
+
+# prunng component by threshold.
+# ALERT this method only can be used for batch=1
+class ThresholdPruningMGSL(nn.Module):
+    def __init__(self, dim: int, ntokens: int, nlabels: int,
+                 in_cho_init=0, t_cho_init=0, out_cho_init=0,
+                 t_cho_method='random', mu_embedding=None, var_embedding=None,
+                 i_comp_num=1, t_comp_num=1, o_comp_num=1, threshold=0.1,
+                 in_mu_drop=0.0, in_cho_drop=0.0, out_mu_drop=0.0,
+                 out_cho_drop=0.0, t_mu_drop=0.0, t_cho_drop=0.0, gaussian_decode=True):
+        super(ThresholdPruningMGSL, self).__init__()
+        import math
+        self.threshold = math.log(threshold)
+
+        self.dim = dim
+        self.ntokens = ntokens
+        self.nlabels = nlabels
+        self.i_comp_num = i_comp_num
+        self.t_comp_num = t_comp_num
+        self.o_comp_num = o_comp_num
+
+        self.gaussian_decode = gaussian_decode
+        # parameter init
+        self.input_mu_embedding = nn.Embedding(self.ntokens, self.i_comp_num * self.dim)
+        self.input_cho_embedding = nn.Embedding(self.ntokens, self.i_comp_num * self.dim)
+        self.input_mu_dropout = nn.Dropout(in_mu_drop)
+        self.input_cho_dropout = nn.Dropout(in_cho_drop)
+
+        self.transition_mu = Parameter(torch.empty(self.t_comp_num, 2 * self.dim), requires_grad=True)
+        self.transition_cho = Parameter(
+            torch.empty(self.t_comp_num, 2 * self.dim, 2 * self.dim), requires_grad=TRANSITION_CHO_GRAD)
+        self.trans_mu_dropout = nn.Dropout(t_mu_drop)
+        self.trans_cho_dropout = nn.Dropout(t_cho_drop)
+
+        # candidate decode method:
+        #   1. gaussian expected likelihood (the gaussian)
+        #   2. only use mu as input of a nn layer
+        #   3. consine distance
+        if gaussian_decode:
+            self.output_mu = Parameter(torch.empty(self.nlabels, self.o_comp_num * self.dim), requires_grad=True)
+            self.output_cho = Parameter(torch.empty(self.nlabels, self.o_comp_num * self.dim),
+                                        requires_grad=DECODE_CHO_GRAD)
+            self.output_mu_dropout = nn.Dropout(out_mu_drop)
+            self.output_cho_dropout = nn.Dropout(out_cho_drop)
+        else:
+            # here we only consider one vector per label
+            assert self.o_comp_num == 1
+            assert self.i_comp_num == 1
+            assert self.t_comp_num == 1
+            self.decode_layer = nn.Linear(self.dim, self.nlabels)
+            self.decode_dropout = nn.Dropout(out_mu_drop)
+
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
+
+        reset_embedding(mu_embedding, self.input_mu_embedding, self.dim, True)
+
+        # init the var
+        if in_cho_init != 0:
+            var_embedding = torch.empty(self.ntokens, self.i_comp_num * self.dim)
+            nn.init.constant_(var_embedding, in_cho_init)
+        reset_embedding(var_embedding, self.input_cho_embedding, self.dim, EMISSION_CHO_GRAD)
+        self.reset_parameter(trans_cho_method=t_cho_method, output_cho_scale=out_cho_init, t_cho_scale=t_cho_init)
+
+    def reset_parameter(self, trans_cho_method='random', output_cho_scale=0, t_cho_scale=0):
+        # transition mu init
+        to_init_transition_mu = self.transition_mu.unsqueeze(0)
+        nn.init.xavier_normal_(to_init_transition_mu)
+        self.transition_mu.data = to_init_transition_mu.squeeze(0)
+        # transition var init
+        if trans_cho_method == 'random':
+            nn.init.uniform_(self.transition_cho)
+            weight = self.transition_cho.data - 0.5
+            weight = torch.tril(weight)
+            self.transition_cho.data = weight + t_cho_scale * torch.eye(2 * self.dim)
+        elif trans_cho_method == 'wishart':
+            transition_var = invwishart.rvs(2 * self.dim, (4 * self.dim + 1) * np.eye(2 * self.dim),
+                                            size=self.t_comp_num, random_state=None)
+            self.transition_cho.data = torch.from_numpy(np.linalg.cholesky(transition_var)).float()
+        else:
+            raise ValueError("Error transition init method")
+        # output mu init
+        if self.gaussian_decode:
+            nn.init.xavier_normal_(self.output_mu)
+
+            # output var init
+            if output_cho_scale == 0:
+                nn.init.uniform_(self.output_cho, a=0.1, b=1.0)
+            else:
+                nn.init.constant_(self.output_cho, output_cho_scale)
+        else:
+            nn.init.xavier_normal_(self.decode_layer.weight)
+
+    def cal_forward(self, max_len, sentence, forward_input_mu_mat, forward_input_var_mat):
+        # update cho_embedding to var_embedding
+        # shape [length, comp, dim]
+
+        trans_mu = self.trans_mu_dropout(self.transition_mu).reshape(1, self.t_comp_num, 2 * self.dim)
+        trans_var = atma(self.trans_cho_dropout(self.transition_cho)).reshape(1, self.t_comp_num, 2 * self.dim, 2 * self.dim)
+
+        # init
+        # shape [pre_comp, trans_comp, dim, dim]
+        init_mu = torch.zeros(1, 1, self.dim, requires_grad=False).to(sentence.device)
+        init_var = torch.eye(self.dim, requires_grad=False).view(1, 1, self.dim, self.dim).to(sentence.device)
+
+        part_score, part_mu, part_var = gaussian_multi_integral(trans_mu, init_mu, trans_var, init_var, need_zeta=True, forward=True)
+        forward_prev_score, forward_prev_mu, forward_prev_var = gaussian_max_k_pruning(part_score.view(-1),
+                                                                                       part_mu.view(-1, self.dim),
+                                                                                       part_var.view(-1, self.dim, self.dim),
+                                                                                       k=self.threshold)
+        forward_holder_score = [forward_prev_score]
+        forward_holder_mu = [forward_prev_mu]
+        forward_holder_var = [forward_prev_var]
+
+        # forward
+        for i in range(max_len):
+            # update forward score from pred and current inside score
+            forward_score, forward_mu, forward_var = gaussian_multi(
+                forward_prev_mu.view(-1, 1, self.dim),
+                forward_input_mu_mat[i].view(1, self.i_comp_num, self.dim),
+                forward_prev_var.view(-1, 1, self.dim, self.dim),
+                forward_input_var_mat[i].view(1, self.i_comp_num, self.dim, self.dim),
+                need_zeta=True)
+            part_score, part_mu, part_var = gaussian_multi_integral(trans_mu.view(1, self.t_comp_num, 2 * self.dim),
+                                                                    forward_mu.view(-1, 1, self.dim),
+                                                                    trans_var.view(1, self.t_comp_num, 2 * self.dim, 2 * self.dim),
+                                                                    forward_var.view(-1, 1, self.dim, self.dim),
+                                                                    need_zeta=True, forward=True)
+
+            # real_forward_score = (part_score + forward_prev_score).reshape(batch, -1, 1) + forward_score
+            real_forward_score = forward_score + forward_prev_score.view(-1, 1) + part_score
+
+            # pruning
+            forward_prev_score, forward_prev_mu, forward_prev_var = gaussian_max_k_pruning(real_forward_score.view(-1),
+                                                                                           part_mu.view(-1, self.dim),
+                                                                                           part_var.view(-1, self.dim, self.dim),
+                                                                                           k=self.threshold)
+            forward_holder_score.append(forward_prev_score)
+            forward_holder_mu.append(forward_prev_mu)
+            forward_holder_var.append(forward_prev_var)
+        return forward_holder_score, forward_holder_mu, forward_holder_var
+
+    def cal_backward(self, max_len, sentence, backward_input_mu_mat, backward_input_var_mat):
+
+        init_mu = torch.zeros(1, 1, self.dim, requires_grad=False).to(sentence.device)
+        init_var = torch.eye(self.dim, requires_grad=False).view(1, 1, self.dim, self.dim).to(sentence.device)
+
+        trans_mu = self.trans_mu_dropout(self.transition_mu).reshape(1, self.t_comp_num, 2 * self.dim)
+        trans_var = atma(self.trans_cho_dropout(self.transition_cho)).reshape(1, self.t_comp_num, 2 * self.dim, 2 * self.dim)
+
+        part_score, part_mu, part_var = gaussian_multi_integral(trans_mu, init_mu, trans_var, init_var, need_zeta=True, forward=False)
+        backward_prev_score, backward_prev_mu, backward_prev_var = gaussian_max_k_pruning(part_score.view(-1),
+                                                                                          part_mu.view(-1, self.dim),
+                                                                                          part_var.view(-1, self.dim, self.dim),
+                                                                                          k=self.threshold)
+
+        backward_holder_score = [backward_prev_score]
+        backward_holder_mu = [backward_prev_mu]
+        backward_holder_var = [backward_prev_var]
+
+        for i in range(max_len):
+            backward_score, backward_mu, backward_var = gaussian_multi(
+                backward_prev_mu.view(-1, 1, self.dim),
+                backward_input_mu_mat[i].view(1, self.i_comp_num, self.dim),
+                backward_prev_var.view(-1, 1, self.dim, self.dim),
+                backward_input_var_mat[i].view(1, self.i_comp_num, self.dim, self.dim),
+                need_zeta=True)
+
+            part_score, part_mu, part_var = gaussian_multi_integral(trans_mu.view(1, self.t_comp_num, 2 * self.dim),
+                                                                    backward_mu.view(-1, 1, self.dim),
+                                                                    trans_var.view(1, self.t_comp_num, 2 * self.dim, 2 * self.dim),
+                                                                    backward_var.view(-1, 1, self.dim, self.dim),
+                                                                    need_zeta=True, forward=False)
+
+            real_backward_score = backward_score + backward_prev_score.view(-1, 1) + part_score
+
+            # pruning
+            backward_prev_score, backward_prev_mu, backward_prev_var = gaussian_max_k_pruning(real_backward_score.view(-1),
+                                                                                              part_mu.view(-1, self.dim),
+                                                                                              part_var.view(-1, self.dim, self.dim),
+                                                                                              k=self.threshold)
+            backward_holder_score.append(backward_prev_score)
+            backward_holder_mu.append(backward_prev_mu)
+            backward_holder_var.append(backward_prev_var)
+
+        backward_holder_score = backward_holder_score[::-1]
+        backward_holder_mu = backward_holder_mu[::-1]
+        backward_holder_var = backward_holder_var[::-1]
+        return backward_holder_score, backward_holder_mu, backward_holder_var
+
+    def cal_expected_count(self, slen, forward_gaussian, backward_gaussian, forward_input_mu_mat, forward_input_var_mat):
+        forward_holder_score, forward_holder_mu, forward_holder_var = forward_gaussian
+        backward_holder_score, backward_holder_mu, backward_holder_var = backward_gaussian
+
+        expected_count_score_holder = []
+        expected_count_mu_holder = []
+        expected_count_var_holder = []
+        # here calculate the expected count at position i.
+        # we need to count previous position forward score i-1
+        # and next position backward score i+1. Thus we here begin with 1.
+        for i in range(0, slen):
+            prev_forward_score = forward_holder_score[i]
+            prev_forward_mu = forward_holder_mu[i]
+            prev_forward_var = forward_holder_var[i]
+
+            current_input_mu = forward_input_mu_mat[i]
+            current_input_var = forward_input_var_mat[i]
+
+            next_backward_score = backward_holder_score[i + 1]
+            next_backward_mu = backward_holder_mu[i + 1]
+            next_backward_var = backward_holder_var[i + 1]
+            # shape [batch, prev_comp, t_comp, dim, dim]
+            part_score, part_mu, part_var = gaussian_multi(prev_forward_mu.reshape(-1, 1, self.dim),
+                                                           current_input_mu.reshape(1, self.i_comp_num, self.dim),
+                                                           prev_forward_var.reshape(-1, 1, self.dim, self.dim),
+                                                           current_input_var.reshape(1, self.i_comp_num, self.dim, self.dim),
+                                                           need_zeta=True)
+
+            part_score = part_score + prev_forward_score.unsqueeze(1)
+            expected_count_score, expected_count_mu, expected_count_var = \
+                gaussian_multi(part_mu.reshape(-1, 1, self.dim),
+                               next_backward_mu.reshape(1, -1, self.dim),
+                               part_var.reshape(-1, 1, self.dim, self.dim),
+                               next_backward_var.reshape(1, -1, self.dim, self.dim), need_zeta=True)
+
+            real_expected_score = part_score.view(-1, 1) + expected_count_score + next_backward_score.view(1, -1)
+
+            pruned_score, pruned_mu, pruned_var = gaussian_max_k_pruning(real_expected_score.view(-1),
+                                                                         expected_count_mu.view(-1, self.dim),
+                                                                         expected_count_var.view(-1, self.dim, self.dim),
+                                                                         k=self.threshold)
+            expected_count_score_holder.append(pruned_score)
+            expected_count_mu_holder.append(pruned_mu)
+            expected_count_var_holder.append(pruned_var)
+
+        return expected_count_score_holder, expected_count_mu_holder, expected_count_var_holder
+
+    def forward(self, sentence: torch.Tensor) -> torch.Tensor:
+
+        slen = sentence.size()[0]
+
+        # get embedding
+        forward_input_mu_mat = self.input_mu_dropout(self.input_mu_embedding(sentence).reshape(slen, self.i_comp_num, self.dim))
+        forward_input_var_embedding = (self.input_cho_dropout(self.input_cho_embedding(sentence)) ** 2).reshape(slen, self.i_comp_num, self.dim)
+
+        forward_input_var_mat = torch.diag_embed(forward_input_var_embedding).float()
+
+        forward_gaussian = self.cal_forward(slen, sentence, forward_input_mu_mat, forward_input_var_mat)
+
+        backward_input_mu_mat = torch.flip(forward_input_mu_mat, dims=[0])
+        backward_input_var_mat = torch.flip(forward_input_var_mat, dims=[0])
+        backward_gaussian = self.cal_backward(slen, sentence, backward_input_mu_mat, backward_input_var_mat)
+
+        expected_count_score_holder, expected_count_mu_holder, expected_count_var_holder = self.cal_expected_count(slen, forward_gaussian, backward_gaussian, forward_input_mu_mat, forward_input_var_mat)
+        if self.gaussian_decode:
+            real_score = []
+            output_mu = self.output_mu_dropout(self.output_mu)
+            output_var = torch.diag_embed(
+                self.output_cho_dropout(self.output_cho).reshape(self.nlabels, self.o_comp_num, self.dim) ** 2).float()
+
+            for i in range(slen):
+                score, _, _ = gaussian_multi(expected_count_mu_holder[i].view(1, -1, 1, self.dim),
+                                             output_mu.view(self.nlabels, 1, self.o_comp_num, self.dim),
+                                             expected_count_var_holder[i].view(1, -1, 1, self.dim, self.dim),
+                                             output_var.view(self.nlabels, 1, self.o_comp_num, self.dim, self.dim),
+                                             need_zeta=True)
+                real_score.append(torch.logsumexp((score + expected_count_score_holder[i].view(1, -1, 1)).view(self.nlabels, -1), dim=-1))
+            return torch.stack(real_score)
+        else:
+            # thus only one gaussian in this method, expected_count_scores is all same
+            # shape [batch, length, comp, dim, dim]
+            # expected_count_scores = torch.stack(expected_count_score_holder, dim=1)
+            expected_count_mus = torch.stack(expected_count_mu_holder, dim=1)
+            # expected_count_vars = torch.stack(expected_count_var_holder, dim=1)
+
+            real_score = self.decode_dropout(self.decode_layer(expected_count_mus.view(slen, -1))).view(slen, self.nlabels)
+        # shape [batch, len-1, vocab_size]
+            return real_score
+
+    def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor,
+                 masks: torch.Tensor, normalize_weight=[0.0, 0.0, 0.0]) -> torch.Tensor:
+        real_score = self.forward(sentences)
+        prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels) * masks
+        # the loss format can fine tune. According to zechuan's investigation.
+        # here our gaussian only trans is non-diagonal. Thus this regularization only suit trans.
+        # TODO here the reg calculate batch times
+        trans_cho = self.transition_cho.view(-1, 2 * self.dim, 2 * self.dim)
+        trans_reg = torch.mean(InvWishart.logpdf(trans_cho, 2 * self.dim, (4 * self.dim + 1) * torch.eye(2 * self.dim)))
+        if self.input_cho_embedding.weight.requires_grad:
+            in_cho = torch.diag_embed(self.input_cho_embedding.weight.reshape(-1, self.i_comp_num, self.dim)).float()
+            in_reg = torch.mean(InvWishart.logpdf(in_cho, self.dim, (2 * self.dim + 1) * torch.eye(self.dim)))
+        else:
+            in_reg = 0.0
+        if self.gaussian_decode:
+            if self.output_cho.requires_grad:
+                out_cho = torch.diag_embed(self.output_cho.reshape(self.nlabels, self.o_comp_num, self.dim))
+                out_reg = torch.mean(InvWishart.logpdf(out_cho, self.dim, (2 * self.dim + 1) * torch.eye(self.dim)))
+            else:
+                out_reg = 0.0
+            reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg + normalize_weight[2] * out_reg
+        else:
+            reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg
+
+        return torch.sum(prob) - reg
 
     def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor,
                 masks: torch.Tensor) -> Tuple:
