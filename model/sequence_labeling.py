@@ -155,8 +155,7 @@ class GaussianSequenceLabeling(nn.Module):
         real_score = self.forward(sentences, backward_order)
         pred = torch.argmax(real_score, dim=-1).cpu().numpy()
         corr = np.sum(np.equal(pred, labels.cpu().numpy()) * masks.cpu().numpy())
-        total = np.sum(masks.cpu().numpy())
-        return corr / total, corr
+        return corr, pred.cpu().numpy()
 
 
 # cho init 0 means random, else means init scale
@@ -274,11 +273,8 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         part_score, part_mu, part_var = gaussian_multi_integral(trans_mu, init_mu, trans_var,
                                                                 init_var, need_zeta=True, forward=True)
         forward_prev_score, forward_prev_mu, forward_prev_var = gaussian_top_k_pruning(part_score.view(batch, -1),
-                                                                                       part_mu.view(batch, -1,
-                                                                                                    self.dim),
-                                                                                       part_var.view(batch, -1,
-                                                                                                     self.dim,
-                                                                                                     self.dim),
+                                                                                       part_mu.view(batch, -1, self.dim),
+                                                                                       part_var.view(batch, -1, self.dim, self.dim),
                                                                                        k=self.max_comp)
         forward_holder_score = [forward_prev_score]
         forward_holder_mu = [forward_prev_mu]
@@ -295,8 +291,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
                 need_zeta=True)
             part_score, part_mu, part_var = gaussian_multi_integral(trans_mu.view(1, 1, self.t_comp_num, 2 * self.dim),
                                                                     forward_mu.view(batch, -1, 1, self.dim),
-                                                                    trans_var.view(1, 1, self.t_comp_num, 2 * self.dim,
-                                                                                   2 * self.dim),
+                                                                    trans_var.view(1, 1, self.t_comp_num, 2 * self.dim, 2 * self.dim),
                                                                     forward_var.view(batch, -1, 1, self.dim, self.dim),
                                                                     need_zeta=True, forward=True)
 
@@ -328,11 +323,8 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         part_score, part_mu, part_var = gaussian_multi_integral(trans_mu, init_mu, trans_var, init_var, need_zeta=True,
                                                                 forward=False)
         backward_prev_score, backward_prev_mu, backward_prev_var = gaussian_top_k_pruning(part_score.view(batch, -1),
-                                                                                          part_mu.view(batch, -1,
-                                                                                                       self.dim),
-                                                                                          part_var.view(batch, -1,
-                                                                                                        self.dim,
-                                                                                                        self.dim),
+                                                                                          part_mu.view(batch, -1, self.dim),
+                                                                                          part_var.view(batch, -1, self.dim, self.dim),
                                                                                           k=self.max_comp)
 
         backward_holder_score = [backward_prev_score]
@@ -349,13 +341,11 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
             part_score, part_mu, part_var = gaussian_multi_integral(trans_mu.view(1, 1, self.t_comp_num, 2 * self.dim),
                                                                     backward_mu.view(batch, -1, 1, self.dim),
-                                                                    trans_var.view(1, 1, self.t_comp_num, 2 * self.dim,
-                                                                                   2 * self.dim),
+                                                                    trans_var.view(1, 1, self.t_comp_num, 2 * self.dim, 2 * self.dim),
                                                                     backward_var.view(batch, -1, 1, self.dim, self.dim),
                                                                     need_zeta=True, forward=False)
 
-            real_backward_score = (backward_score + backward_prev_score.view(batch, -1, 1)).reshape(batch, -1,
-                                                                                                    1) + part_score
+            real_backward_score = (backward_score + backward_prev_score.view(batch, -1, 1)).reshape(batch, -1, 1) + part_score
 
             # pruning
             backward_prev_score, backward_prev_mu, backward_prev_var = gaussian_top_k_pruning(
@@ -396,11 +386,9 @@ class MixtureGaussianSequenceLabeling(nn.Module):
             next_backward_var = backward_holder_var[i + 1]
             # shape [batch, prev_comp, t_comp, dim, dim]
             part_score, part_mu, part_var = gaussian_multi(prev_forward_mu.reshape(batch, -1, 1, self.dim),
-                                                           current_input_mu.reshape(batch, 1, self.i_comp_num,
-                                                                                    self.dim),
+                                                           current_input_mu.reshape(batch, 1, self.i_comp_num, self.dim),
                                                            prev_forward_var.reshape(batch, -1, 1, self.dim, self.dim),
-                                                           current_input_var.reshape(batch, 1, self.i_comp_num,
-                                                                                     self.dim, self.dim),
+                                                           current_input_var.reshape(batch, 1, self.i_comp_num, self.dim, self.dim),
                                                            need_zeta=True)
 
             part_score = part_score + prev_forward_score.reshape(batch, -1, 1)
@@ -415,8 +403,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
             pruned_score, pruned_mu, pruned_var = gaussian_top_k_pruning(real_expected_score.reshape(batch, -1),
                                                                          expected_count_mu.reshape(batch, -1, self.dim),
-                                                                         expected_count_var.reshape(batch, -1, self.dim,
-                                                                                                    self.dim),
+                                                                         expected_count_var.reshape(batch, -1, self.dim, self.dim),
                                                                          k=self.max_comp)
             expected_count_score_holder.append(pruned_score)
             expected_count_mu_holder.append(pruned_mu)
@@ -500,13 +487,11 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
         return (torch.sum(prob) - reg) / sentences.size(0)
 
-    def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor,
-                masks: torch.Tensor) -> Tuple:
+    def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor, masks: torch.Tensor) -> Tuple:
         real_score = self.forward(sentences)
         pred = torch.argmax(real_score, dim=-1).cpu().numpy()
         corr = np.sum(np.equal(pred, labels.cpu().numpy()) * masks.cpu().numpy())
-        total = np.sum(masks.cpu().numpy())
-        return corr / total, corr
+        return corr, pred
 
 
 # prunng component by threshold.
@@ -817,8 +802,7 @@ class ThresholdPruningMGSL(nn.Module):
         real_score = self.forward(sentences)
         pred = torch.argmax(real_score, dim=-1).cpu().numpy()
         corr = np.sum(np.equal(pred, labels.cpu().numpy()) * masks.cpu().numpy())
-        total = np.sum(masks.cpu().numpy())
-        return corr / total, corr
+        return corr, pred
 
 
 class RNNSequenceLabeling(nn.Module):
@@ -878,5 +862,4 @@ class RNNSequenceLabeling(nn.Module):
         real_score = self.forward(sentences, masks)
         pred = torch.argmax(real_score, dim=-1).cpu().numpy()
         corr = np.sum(np.equal(pred, labels.cpu().numpy()) * masks.cpu().numpy())
-        total = np.sum(masks.cpu().numpy())
-        return corr / total, corr
+        return corr, pred

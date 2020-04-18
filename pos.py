@@ -13,22 +13,26 @@ from model.sequence_labeling import *
 from model.weighted_iohmm import WeightIOHMM
 # from misc.sharp_detect import SharpDetector
 from optim.lr_scheduler import ExponentialScheduler
+from analyzer.analyzer import Analyzer
 
 
 def evaluate(data, batch, model, device):
     model.eval()
     total_token_num = 0
     corr_token_num = 0
+    total_pred = []
     with torch.no_grad():
         for batch_data in iterate_data(data, batch):
             # sentences, labels, masks, revert_order = standardize_batch(data[i * batch: (i + 1) * batch])
             words = batch_data['WORD'].squeeze().to(device)
             labels = batch_data['POS'].squeeze().to(device)
             masks = batch_data['MASK'].squeeze().to(device)
-            acc, corr = model.get_acc(words, labels, masks)
+            corr, preds = model.get_acc(words, labels, masks)
             corr_token_num += corr
             total_token_num += torch.sum(masks).item()
-    return corr_token_num / total_token_num, corr_token_num
+            for pred in preds.tolist():
+                total_pred.append(pred)
+    return corr_token_num / total_token_num, total_pred
 
 
 def get_optimizer(parameters, optim, learning_rate, amsgrad, weight_decay, lr_decay, warmup_steps):
@@ -47,6 +51,32 @@ def save_parameter_to_json(path, parameters):
         json.dump(parameters, f)
 
 
+def analyse(model, dataset, batch_size, device, analyzer, path_name, buckted=False):
+    pred_holder = []
+    golden_holder = []
+    length_holder = []
+    sentence_holder = []
+    model.eval()
+
+    with torch.no_grad():
+        for step, data in enumerate(iterate_data(dataset, batch_size, bucketed=buckted)):
+            words, labels, masks = data['WORD'].squeeze().to(device), \
+                                   data['POS'].squeeze().to(device), \
+                                   data['MASK'].squeeze().to(device)
+            corr, preds = model.get_acc(words, labels, masks)
+            if batch_size == 1:
+                pred_holder.append(preds.tolist())
+                golden_holder.append(labels.cpu().numpy().tolist())
+                length_holder.append(np.sum(masks.cpu().numpy()))
+                sentence_holder.append(words.cpu().numpy().tolist())
+            else:
+                pred_holder += preds.astype(int).tolist()
+                golden_holder += labels.cpu().numpy().astype(int).tolist()
+                length_holder += np.sum(masks.cpu().numpy(), axis=-1).astype(int).tolist()
+                sentence_holder += words.cpu().numpy().astype(int).tolist()
+    analyzer.error_rate(sentence_holder, pred_holder, golden_holder, length_holder, path_name)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Gaussian Input Output HMM")
 
@@ -56,8 +86,8 @@ def main():
         default='./dataset/ptb/',
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=256)
-    parser.add_argument('--optim', choices=['sgd', 'adam'], default='sgd')
-    parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--optim', choices=['sgd', 'adam'], default='adam')
+    parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--lr_decay', type=float, default=0.999995, help='Decay rate of learning rate')
     parser.add_argument('--amsgrad', action='store_true', help='AMD Grad')
     parser.add_argument('--weight_decay', type=float, default=0.001, help='weight for l2 norm decay')
@@ -66,7 +96,7 @@ def main():
     parser.add_argument('--var_scale', type=float, default=1.0)
     parser.add_argument('--log_dir', type=str,
                         default='./output/' + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + "/")
-    parser.add_argument('--dim', type=int, default=5)
+    parser.add_argument('--dim', type=int, default=10)
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
     parser.add_argument('--in_mu_drop', type=float, default=0.0)
@@ -83,13 +113,13 @@ def main():
     parser.add_argument('--output_cho_init', type=float, default=0.0,
                         help='init method of output cholesky matrix. 0 means random. The other score means constant')
     # i_comp_num = 1, t_comp_num = 1, o_comp_num = 1, max_comp = 1,
-    parser.add_argument('--input_comp_num', type=int, default=2,
+    parser.add_argument('--input_comp_num', type=int, default=1,
                         help='input mixture gaussian component number')
     parser.add_argument('--tran_comp_num', type=int, default=1,
                         help='transition mixture gaussian component number')
     parser.add_argument('--output_comp_num', type=int, default=1,
                         help='output mixture gaussian component number')
-    parser.add_argument('--threshold', type=float, default=0.1,
+    parser.add_argument('--threshold', type=float, default=1.0,
                         help='pruning hyper-parameter, greater than 1 is max component, less than 1 is max value')
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
     parser.add_argument('--tran_weight', type=float, default=0.0001)
@@ -99,6 +129,7 @@ def main():
     parser.add_argument('--transition_cho_grad', type=bool, default=True)
     parser.add_argument('--decode_cho_grad', type=bool, default=False)
     parser.add_argument('--gaussian_decode', action='store_true')
+    parser.add_argument('--analysis', action='store_true')
 
     args = parser.parse_args()
 
@@ -136,6 +167,8 @@ def main():
     unk_replace = args.unk_replace
     normalize_weight = [args.tran_weight, args.input_weight, args.output_weight]
     gaussian_decode = args.gaussian_decode
+
+    analysis = args.analysis
 
     EMISSION_CHO_GRAD = args.emission_cho_grad
     TRANSITION_CHO_GRAD = args.transition_cho_grad
@@ -176,6 +209,12 @@ def main():
     logger.info("POS Alphabet Size: %d" % pos_alphabet.size())
     ntokens = word_alphabet.size()
     nlabels = pos_alphabet.size()
+
+    # init analyzer
+    if analysis:
+        analyzer = Analyzer(word_alphabet=word_alphabet, pos_alphabet=pos_alphabet)
+    else:
+        analyzer = None
 
     # build model
     if threshold >= 1.0:
@@ -252,10 +291,14 @@ def main():
                     num_back = len(log_info)
             logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / num_insts, 4)))
             if threshold >= 1.0:
-                acc, corr = evaluate(dev_dataset, batch_size, model, device)
+                acc, _ = evaluate(dev_dataset, batch_size, model, device)
             else:
-                acc, corr = evaluate(dev_dataset, 1, model, device)
+                acc, _ = evaluate(dev_dataset, 1, model, device)
             logger.info('\t Dev Acc: ' + str(round(acc * 100, 3)))
+            if analysis:
+                analyse(model, dev_dataset, batch_size, device, analyzer, log_dir + '/dev_' + str(epoch), buckted=False)
+                analyse(model, test_dataset, batch_size, device, analyzer, log_dir + '/test_' + str(epoch), buckted=False)
+
             if best_epoch[1] < acc:
                 test_acc, _ = evaluate(test_dataset, batch_size, model, device)
                 logger.info('\t Test Acc: ' + str(round(test_acc * 100, 3)))

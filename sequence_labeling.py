@@ -51,15 +51,18 @@ def evaluate(data, batch, model, device):
     model.eval()
     total_token_num = 0
     corr_token_num = 0
+    total_pred = []
     with torch.no_grad():
         for i in range(math.ceil(len(data) / batch)):
             sentences, labels, masks, revert_order = standardize_batch(data[i * batch: (i + 1) * batch])
-            acc, corr = model.get_acc(sentences.squeeze().to(device),
+            corr, preds = model.get_acc(sentences.squeeze().to(device),
                                       labels.squeeze().to(device),
                                       masks.squeeze().to(device))
             corr_token_num += corr
             total_token_num += torch.sum(masks).item()
-    return corr_token_num / total_token_num, corr_token_num
+            for pred in preds.tolist():
+                total_pred.append(pred)
+        return corr_token_num / total_token_num, total_pred
 
 
 def save_parameter_to_json(path, parameters):
@@ -105,7 +108,7 @@ def main():
     parser.add_argument('--input_comp_num', type=int, default=1, help='input mixture gaussian component number')
     parser.add_argument('--tran_comp_num', type=int, default=2, help='transition mixture gaussian component number')
     parser.add_argument('--output_comp_num', type=int, default=1, help='output mixture gaussian component number')
-    parser.add_argument('--threshold', type=float, default=0.1,
+    parser.add_argument('--threshold', type=float, default=1.0,
                         help='pruning hyper-parameter, greater than 1 is max component, less than 1 is max value')
     parser.add_argument('--tran_weight', type=float, default=0.0001)
     parser.add_argument('--input_weight', type=float, default=0.0)
@@ -234,9 +237,9 @@ def main():
                 epoch_loss += (loss.item()) # * sentences.size(0)
             logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / len(train_dataset), 4)))
             if threshold >= 1.0:
-                acc, corr = evaluate(dev_dataset, batch_size, model, device)
+                acc, _ = evaluate(dev_dataset, batch_size, model, device)
             else:
-                acc, corr = evaluate(dev_dataset, 1, model, device)
+                acc, _ = evaluate(dev_dataset, 1, model, device)
             logger.info('\t Dev Acc: ' + str(round(acc * 100, 3)))
             if best_epoch[1] < acc:
                 if threshold >= 1.0:
