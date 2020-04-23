@@ -10,8 +10,10 @@ from torch.optim.adamw import AdamW
 
 from tqdm import tqdm
 
+from io_module import sst_data
 from io_module.data_loader import *
 from io_module.logger import *
+from io_module.utils import iterate_data
 from model.sequence_classification import *
 from model.weighted_iohmm import WeightIOHMM
 from optim.lr_scheduler import ExponentialScheduler
@@ -48,11 +50,11 @@ def evaluate(data, batch, model, device):
     corr_token_num = 0
     total_pred = []
     with torch.no_grad():
-        for i in range(math.ceil(len(data) / batch)):
-            sentences, labels, lengths = standardize_batch(data[i * batch: (i + 1) * batch])
-            corr, preds = model.get_acc(sentences.squeeze().to(device),
-                                      labels[:, 0].squeeze().to(device),
-                                      lengths.squeeze().to(device))
+        for batch_data in iterate_data(data, batch):
+            sentences = batch_data['WORD'].squeeze().to(device)
+            labels = batch_data['LAB'].squeeze().to(device)
+            lengths = batch_data['LeNGTH'].squeeze().to(device)
+            corr, preds = model.get_acc(sentences, labels, lengths)
             corr_token_num += corr
             preds = preds.tolist()
             if isinstance(preds, int):
@@ -74,7 +76,7 @@ def main():
     parser.add_argument(
         '--data',
         type=str,
-        default='./dataset/syntic_data_yong/0-1000-10-new',
+        default='./dataset/sst/',
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=20)
     parser.add_argument('--optim', choices=['sgd', 'adam'], default='adam')
@@ -115,6 +117,7 @@ def main():
     parser.add_argument('--transition_cho_grad', type=bool, default=True)
     parser.add_argument('--decode_cho_grad', type=bool, default=False)
     parser.add_argument('--gaussian_decode', action='store_true')
+    parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
 
     args = parser.parse_args()
 
@@ -152,6 +155,8 @@ def main():
     normalize_weight = [args.tran_weight, args.input_weight, args.output_weight]
     gaussian_decode = args.gaussian_decode
 
+    unk_replace = args.unk_replace
+
     EMISSION_CHO_GRAD = args.emission_cho_grad
     TRANSITION_CHO_GRAD = args.transition_cho_grad
     DECODE_CHO_GRAD = args.decode_cho_grad
@@ -159,8 +164,6 @@ def main():
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     save_parameter_to_json(log_dir, vars(args))
-    ntokens = 1000
-    nlabels = 5
     # save parameter
     logger = get_logger('Sequence-Classification')
     # change_handler(logger, log_dir)
@@ -170,9 +173,19 @@ def main():
     device = torch.device('cuda') if args.gpu else torch.device('cpu')
     # Loading data
     logger.info('Load data....')
-    train_dataset = read_sequence_labeling_data(root, type='train')
-    dev_dataset = read_sequence_labeling_data(root, type='dev')
-    test_dataset = read_sequence_labeling_data(root, type='test')
+    alphabet_path = os.path.join(root, 'alphabets')
+    train_path = os.path.join(root, 'plain-train-2')
+    dev_path = os.path.join(root, 'plain-dev-2')
+    test_path = os.path.join(root, 'plain-test-2')
+    word_alphabet = sst_data.create_alphabets(alphabet_path, train_path, data_paths=[dev_path, test_path])
+    train_dataset = sst_data.read_bucketed_data(train_path, word_alphabet)
+    num_data = sum(train_dataset[1])
+    dev_dataset = sst_data.read_data(dev_path, word_alphabet)
+    test_dataset = sst_data.read_data(test_path, word_alphabet)
+
+    logger.info("Word Alphabet Size: %d" % word_alphabet.size())
+    ntokens = word_alphabet.size()
+    nlabels = 2
 
     # build model
     if threshold >= 1.0:
@@ -205,6 +218,7 @@ def main():
                                          lr_decay=lr_decay, warmup_steps=warmup_steps)
     # depend on dev ppl
     best_epoch = (-1, 0.0, 0.0)
+    num_batches = num_data // batch_size + 1
 
     # Default: util 6 epoch not update best_epoch
     # If aim_epoch is not 0. It will train aim_epoch times.
@@ -212,24 +226,22 @@ def main():
         epoch = best_epoch[0] + 1
         while epoch - best_epoch[0] <= thread:
             epoch_loss = 0
-            random.shuffle(train_dataset)
             model.train()
-            optimizer.zero_grad()
-            for j in tqdm(range(math.ceil(len(train_dataset) / batch_size))):
-                samples = train_dataset[j * batch_size: (j + 1) * batch_size]
-
-                sentences, labels, lengths = standardize_batch(samples)
+            for step, data in enumerate(iterate_data(train_dataset, batch_size, bucketed=True, unk_replace=unk_replace, shuffle=True)):
+                optimizer.zero_grad()
+                # samples = train_dataset[j * batch_size: (j + 1) * batch_size]
+                words, labels, lengths = data['WORD'].to(device), data['LAB'].to(device), data['LENGTH'].to(device)
                 loss = 0
                 if threshold >= 1.0:
-                    loss = model.get_loss(sentences, labels[:, 0], lengths, normalize_weight=normalize_weight)
+                    loss = model.get_loss(words, labels, lengths, normalize_weight=normalize_weight)
                 else:
                     for i in range(batch_size):
-                        loss += model.get_loss(sentences[i], labels[i][0], lengths[i], normalize_weight=normalize_weight)
+                        loss += model.get_loss(words[i], labels[i], lengths[i], normalize_weight=normalize_weight)
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
-                epoch_loss += loss.item() * sentences.size(0)
+                epoch_loss += loss.item() * words.size(0)
             logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / len(train_dataset), 4)))
             if threshold >= 1.0:
                 acc, _ = evaluate(dev_dataset, batch_size, model, device)

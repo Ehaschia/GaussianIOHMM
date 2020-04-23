@@ -187,3 +187,30 @@ class CoNLL03Reader(object):
 
         return NERInstance(Sentence(words, word_ids, char_seqs, char_id_seqs),
                            postags, pos_ids, chunk_tags, chunk_ids, ner_tags, ner_ids)
+
+
+class SSTReader(object):
+    def __init__(self, file_path, word_alphabet):
+        self.__source_file = open(file_path, 'r')
+        self.__word_alphabet = word_alphabet
+
+    def close(self):
+        self.__source_file.close()
+
+    def getNext(self, normalize_digits=True):
+        line = self.__source_file.readline()
+        # skip multiple blank lines.
+        while len(line) > 0 and len(line.strip()) == 0:
+            line = self.__source_file.readline()
+        if len(line) == 0:
+            return None
+
+        line = line.strip().split('\t')
+        label = line[1]
+        words = line[0].strip().split(' ')
+
+        words = [DIGIT_RE.sub("0", word) if normalize_digits else word for word in words]
+        word_ids = [self.__word_alphabet.get_index(i) for i in words]
+        label_id = int(label)
+
+        return NERInstance(Sentence(words, word_ids, None, None), label, label_id, None, None, None, None)
