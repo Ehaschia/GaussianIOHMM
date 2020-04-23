@@ -191,7 +191,8 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         return real_score
 
     def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor,
-                 length: torch.Tensor, normalize_weight=[0.0, 0.0, 0.0]) -> torch.Tensor:
+                 masks: torch.Tensor, normalize_weight=[0.0, 0.0, 0.0]) -> torch.Tensor:
+        length = torch.sum(masks, dim=-1).long()
         real_score = self.forward(sentences, length)
         prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels)
         # the loss format can fine tune. According to zechuan's investigation.
@@ -215,7 +216,8 @@ class MixtureGaussianSequenceLabeling(nn.Module):
 
         return (torch.sum(prob) - reg) / sentences.size(0)
 
-    def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor, length: torch.Tensor) -> Tuple:
+    def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor, masks: torch.Tensor) -> Tuple:
+        length = torch.sum(masks, dim=-1).long()
         real_score = self.forward(sentences, length)
         pred = torch.argmax(real_score, dim=-1).cpu().numpy()
         corr = np.sum(np.equal(pred, labels.cpu().numpy()))
@@ -384,7 +386,8 @@ class ThresholdPruningMGSL(nn.Module):
         # shape [batch, len-1, vocab_size]
         return real_score
 
-    def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor, slen: int, normalize_weight=[0.0, 0.0, 0.0]) -> torch.Tensor:
+    def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor, normalize_weight=[0.0, 0.0, 0.0]) -> torch.Tensor:
+        slen = torch.sum(mask).long()
         real_score = self.forward(sentences, slen)
         prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels)
         # the loss format can fine tune. According to zechuan's investigation.
@@ -409,7 +412,8 @@ class ThresholdPruningMGSL(nn.Module):
 
         return torch.sum(prob) - reg
 
-    def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor, slen: int) -> Tuple:
+    def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor) -> Tuple:
+        slen = torch.sum(mask).long()
         real_score = self.forward(sentences, slen)
         pred = torch.argmax(real_score, dim=-1).cpu().numpy()
         corr = 1 if pred == labels.cpu().numpy() else 0
@@ -424,7 +428,7 @@ class RNNSequenceLabeling(nn.Module):
         self.drop = nn.Dropout(dropout)
         self.encoder = nn.Embedding(self.ntokens, ninp)
         if rnn_type in ['LSTM', 'GRU']:
-            self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout, batch_first=True, bidirectional=True)
+            self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout, batch_first=True, bidirectional=False)
         else:
             try:
                 nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
@@ -432,8 +436,8 @@ class RNNSequenceLabeling(nn.Module):
                 raise ValueError("""An invalid option for `--model` was supplied,
                                  options are ['LSTM', 'GRU', 'RNN_TANH' or 'RNN_RELU']""")
             self.rnn = nn.RNN(ninp, nhid, nlayers, nonlinearity=nonlinearity, dropout=dropout, batch_first=True,
-                              bidirectional=True)
-        self.decoder = nn.Linear(2 * nhid, self.nlabels)
+                              bidirectional=False)
+        self.decoder = nn.Linear(nhid, self.nlabels)
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
         if tie_weights:
@@ -459,18 +463,20 @@ class RNNSequenceLabeling(nn.Module):
                                                        enforce_sorted=False)
         packed_output, hidden = self.rnn(packed_emb)
         output, _ = nn.utils.rnn.pad_packed_sequence(packed_output, batch_first=True)
-        decoded = self.decoder(self.drop(output))
+        length = torch.sum(masks, dim=-1).long()
+        seq_end = output[torch.arange(sentences.size()[0]), length-1]
+        decoded = self.decoder(self.drop(seq_end))
         return decoded
 
     def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor,
                  masks: torch.Tensor) -> torch.Tensor:
         real_score = self.forward(sentences, masks)
-        prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels) * masks
+        prob = self.criterion(real_score, labels)
         return torch.sum(prob) / sentences.size(0)
 
     def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor,
                 masks: torch.Tensor) -> Tuple:
         real_score = self.forward(sentences, masks)
         pred = torch.argmax(real_score, dim=-1).cpu().numpy()
-        corr = np.sum(np.equal(pred, labels.cpu().numpy()) * masks.cpu().numpy())
+        corr = np.sum(np.equal(pred, labels.cpu().numpy()))
         return corr, pred

@@ -86,7 +86,7 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
 
                 type = tokens[7]
                 type_alphabet.add(type)
-
+        # TODO fix the unk bug here
         # collect singletons
         singletons = set([word for word, count in vocab.items() if count <= min_occurrence])
 

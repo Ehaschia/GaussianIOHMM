@@ -1,17 +1,13 @@
 # coding: utf-8
 import argparse
 import json
-import math
 import random
 from typing import List
 
 from torch.optim import SGD
 from torch.optim.adamw import AdamW
 
-from tqdm import tqdm
-
 from io_module import sst_data
-from io_module.data_loader import *
 from io_module.logger import *
 from io_module.utils import iterate_data
 from model.sequence_classification import *
@@ -51,10 +47,10 @@ def evaluate(data, batch, model, device):
     total_pred = []
     with torch.no_grad():
         for batch_data in iterate_data(data, batch):
-            sentences = batch_data['WORD'].squeeze().to(device)
-            labels = batch_data['LAB'].squeeze().to(device)
-            lengths = batch_data['LeNGTH'].squeeze().to(device)
-            corr, preds = model.get_acc(sentences, labels, lengths)
+            sentences = batch_data['WORD'].to(device)
+            labels = batch_data['LAB'].to(device)
+            masks = batch_data['MASK'].to(device)
+            corr, preds = model.get_acc(sentences, labels, masks)
             corr_token_num += corr
             preds = preds.tolist()
             if isinstance(preds, int):
@@ -62,7 +58,7 @@ def evaluate(data, batch, model, device):
             else:
                 for pred in preds:
                     total_pred.append(pred)
-        return corr_token_num / len(data), total_pred
+    return corr_token_num / data[1], total_pred
 
 
 def save_parameter_to_json(path, parameters):
@@ -230,19 +226,20 @@ def main():
             for step, data in enumerate(iterate_data(train_dataset, batch_size, bucketed=True, unk_replace=unk_replace, shuffle=True)):
                 optimizer.zero_grad()
                 # samples = train_dataset[j * batch_size: (j + 1) * batch_size]
-                words, labels, lengths = data['WORD'].to(device), data['LAB'].to(device), data['LENGTH'].to(device)
+                words, labels, masks = data['WORD'].to(device), data['LAB'].to(device), data['MASK'].to(device)
                 loss = 0
                 if threshold >= 1.0:
-                    loss = model.get_loss(words, labels, lengths, normalize_weight=normalize_weight)
+                    loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight)
                 else:
                     for i in range(batch_size):
-                        loss += model.get_loss(words[i], labels[i], lengths[i], normalize_weight=normalize_weight)
+                        loss += model.get_loss(words[i], labels[i], masks[i], normalize_weight=normalize_weight)
+                # loss = model.get_loss(words, labels, masks)
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
                 epoch_loss += loss.item() * words.size(0)
-            logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / len(train_dataset), 4)))
+            logger.info('Epoch ' + str(epoch) + ' Loss: ' + str(round(epoch_loss / num_data, 4)))
             if threshold >= 1.0:
                 acc, _ = evaluate(dev_dataset, batch_size, model, device)
             else:
@@ -268,7 +265,7 @@ def main():
     #     # flip
     #     parameter.requires_grad = not parameter.requires_grad
 
-    best_epoch = train(best_epoch, thread=50)
+    best_epoch = train(best_epoch, thread=6)
 
     # logger.info("After tunning var. Here we tunning mu")
     #

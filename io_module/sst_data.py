@@ -12,6 +12,7 @@ from io_module.common import PAD, PAD_ID_WORD
 from io_module.common import ROOT, END
 from io_module.logger import get_logger
 from io_module.reader import SSTReader
+from io_module.refine_unknown import UNKRefiner
 
 # Special vocabulary symbols - we always put them at the start.
 _START_VOCAB = [PAD, ROOT, END]
@@ -20,10 +21,8 @@ NUM_SYMBOLIC_TAGS = 3
 _buckets = [10, 15, 30, 50, 80]
 
 
-
 def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabulary_size=100000, embedd_dict=None,
                      min_occurrence=1, normalize_digits=True):
-
     def expand_vocab():
         vocab_set = set(vocab_list)
         for data_path in data_paths:
@@ -78,7 +77,6 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
 
         if data_paths is not None and embedd_dict is not None:
             expand_vocab()
-
         for word in vocab_list:
             if word in multi_vocab:
                 word_alphabet.add(word)
@@ -86,6 +84,11 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
                 word_alphabet.add_singleton(word_alphabet.get_index(word))
             else:
                 raise ValueError("Error word: " + word)
+        refiner = UNKRefiner(0, word_alphabet)
+        # TODO fix the pos here
+        for word in singletons:
+            unk_signature = refiner.refine(word, 0)
+            word_alphabet.add(unk_signature)
 
         word_alphabet.save(alphabet_directory)
     else:
@@ -119,7 +122,6 @@ def read_data(source_path: str, word_alphabet: Alphabet, max_size=None, normaliz
     data_size = len(data)
     wid_inputs = np.empty([data_size, max_length], dtype=np.int64)
     lid_inputs = np.empty([data_size], dtype=np.int64)
-
 
     masks = np.zeros([data_size, max_length], dtype=np.float32)
     single = np.zeros([data_size, max_length], dtype=np.int64)

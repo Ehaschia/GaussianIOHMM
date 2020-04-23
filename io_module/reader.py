@@ -105,7 +105,6 @@ class CoNLLXReader(object):
                 if word_idx < 0:
                     unk_signature = self.refiner.refine(word, position)
                     self.__word_alphabet.add(unk_signature)
-                    idx = self.__word_alphabet.get_index(unk_signature)
                     word_ids.append(self.__word_alphabet.get_index(unk_signature))
                 else:
                     word_ids.append(self.__word_alphabet.get_index(word))
@@ -190,9 +189,13 @@ class CoNLL03Reader(object):
 
 
 class SSTReader(object):
-    def __init__(self, file_path, word_alphabet):
+    def __init__(self, file_path, word_alphabet, refine_unk=True):
         self.__source_file = open(file_path, 'r')
         self.__word_alphabet = word_alphabet
+        if refine_unk:
+            self.refiner = UNKRefiner(0, self.__word_alphabet)
+        else:
+            self.refiner = None
 
     def close(self):
         self.__source_file.close()
@@ -208,9 +211,20 @@ class SSTReader(object):
         line = line.strip().split('\t')
         label = line[1]
         words = line[0].strip().split(' ')
+        word_ids = []
+        for pos, word in enumerate(words):
+            word = DIGIT_RE.sub("0", word) if normalize_digits else word
+            if self.refiner is not None:
+                word_id = self.__word_alphabet.get_index(word)
+                if word_id < 0:
+                    unk_signature = self.refiner.refine(word, pos)
+                    self.__word_alphabet.add(unk_signature)
+                    word_ids.append(self.__word_alphabet.get_index(unk_signature))
+                else:
+                    word_ids.append(word_id)
+            else:
+                 word_ids.append(self.__word_alphabet.get_index(word))
 
-        words = [DIGIT_RE.sub("0", word) if normalize_digits else word for word in words]
-        word_ids = [self.__word_alphabet.get_index(i) for i in words]
         label_id = int(label)
 
         return NERInstance(Sentence(words, word_ids, None, None), label, label_id, None, None, None, None)
