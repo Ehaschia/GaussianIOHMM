@@ -104,7 +104,6 @@ class CoNLLXReader(object):
                 word_idx = self.__word_alphabet.get_index(word)
                 if word_idx < 0:
                     unk_signature = self.refiner.refine(word, position)
-                    self.__word_alphabet.add(unk_signature)
                     word_ids.append(self.__word_alphabet.get_index(unk_signature))
                 else:
                     word_ids.append(self.__word_alphabet.get_index(word))

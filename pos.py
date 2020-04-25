@@ -83,7 +83,7 @@ def main():
     parser.add_argument(
         '--data',
         type=str,
-        default='./dataset/uden/',
+        default='./dataset/ptb/',
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=256)
     parser.add_argument('--optim', choices=['sgd', 'adam'], default='adam')
@@ -130,7 +130,7 @@ def main():
     parser.add_argument('--decode_cho_grad', type=bool, default=False)
     parser.add_argument('--gaussian_decode', action='store_true')
     parser.add_argument('--analysis', action='store_true')
-    parser.add_argument('--sep_normalize', type=float, default=0.0)
+    parser.add_argument('--sep_normalize', type=float, default=0.01)
 
     args = parser.parse_args()
 
@@ -200,8 +200,7 @@ def main():
                                                                                              max_vocabulary_size=1e5,
                                                                                              min_occurrence=1)
 
-    train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet,
-                                                   type_alphabet)
+    train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
     num_data = sum(train_dataset[1])
     dev_dataset = conllx_data.read_data(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
     test_dataset = conllx_data.read_data(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)

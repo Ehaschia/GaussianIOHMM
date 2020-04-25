@@ -11,6 +11,7 @@ from io_module.logger import get_logger
 from io_module.common import DIGIT_RE, MAX_CHAR_LENGTH
 from io_module.common import PAD_CHAR, PAD, PAD_POS, PAD_TYPE, PAD_ID_CHAR, PAD_ID_TAG, PAD_ID_WORD
 from io_module.common import ROOT, END, ROOT_CHAR, ROOT_POS, ROOT_TYPE, END_CHAR, END_POS, END_TYPE
+from io_module.refine_unknown import UNKRefiner
 
 # Special vocabulary symbols - we always put them at the start.
 _START_VOCAB = [PAD, ROOT, END]
@@ -20,7 +21,7 @@ _buckets = [10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 140]
 
 
 def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabulary_size=100000, embedd_dict=None,
-                     min_occurrence=1, normalize_digits=True):
+                     min_occurrence=1, normalize_digits=True, unk_rank=5):
 
     def expand_vocab():
         vocab_set = set(vocab_list)
@@ -52,80 +53,88 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
     char_alphabet = Alphabet('character')
     pos_alphabet = Alphabet('pos')
     type_alphabet = Alphabet('type')
-    if not os.path.isdir(alphabet_directory):
-        logger.info("Creating Alphabets: %s" % alphabet_directory)
 
-        char_alphabet.add(PAD_CHAR)
-        pos_alphabet.add(PAD_POS)
-        type_alphabet.add(PAD_TYPE)
+    logger.info("Creating Alphabets: %s" % alphabet_directory)
 
-        char_alphabet.add(ROOT_CHAR)
-        pos_alphabet.add(ROOT_POS)
-        type_alphabet.add(ROOT_TYPE)
+    char_alphabet.add(PAD_CHAR)
+    pos_alphabet.add(PAD_POS)
+    type_alphabet.add(PAD_TYPE)
 
-        char_alphabet.add(END_CHAR)
-        pos_alphabet.add(END_POS)
-        type_alphabet.add(END_TYPE)
+    char_alphabet.add(ROOT_CHAR)
+    pos_alphabet.add(ROOT_POS)
+    type_alphabet.add(ROOT_TYPE)
 
-        vocab = defaultdict(int)
-        with open(train_path, 'r') as file:
-            for line in file:
-                line = line.strip()
-                if len(line) == 0:
-                    continue
+    char_alphabet.add(END_CHAR)
+    pos_alphabet.add(END_POS)
+    type_alphabet.add(END_TYPE)
 
-                tokens = line.split('\t')
-                for char in tokens[1]:
-                    char_alphabet.add(char)
+    vocab = defaultdict(int)
 
-                word = DIGIT_RE.sub("0", tokens[1]) if normalize_digits else tokens[1]
-                vocab[word] += 1
+    # here we use the list to save every word and position
+    word_collect = []
+    with open(train_path, 'r') as file:
+        words = []
+        position = 0
+        for line in file:
+            line = line.strip()
+            if len(line) == 0:
+                position = 0
+                word_collect.append(words)
+                words = []
+                continue
 
-                pos = tokens[4]
-                pos_alphabet.add(pos)
+            tokens = line.split('\t')
+            for char in tokens[1]:
+                char_alphabet.add(char)
 
-                type = tokens[7]
-                type_alphabet.add(type)
-        # TODO fix the unk bug here
-        # collect singletons
-        singletons = set([word for word, count in vocab.items() if count <= min_occurrence])
+            word = DIGIT_RE.sub("0", tokens[1]) if normalize_digits else tokens[1]
+            vocab[word] += 1
+            words.append((word, position))
+            position += 1
 
-        # if a singleton is in pretrained embedding dict, set the count to min_occur + c
-        if embedd_dict is not None:
-            assert isinstance(embedd_dict, OrderedDict)
-            for word in vocab.keys():
-                if word in embedd_dict or word.lower() in embedd_dict:
-                    vocab[word] += min_occurrence
+            pos = tokens[4]
+            pos_alphabet.add(pos)
 
-        vocab_list = _START_VOCAB + sorted(vocab, key=vocab.get, reverse=True)
-        logger.info("Total Vocabulary Size: %d" % len(vocab_list))
-        logger.info("Total Singleton Size:  %d" % len(singletons))
-        multi_vocab = [word for word in vocab_list if word in _START_VOCAB or vocab[word] > min_occurrence]
-        logger.info("Total Vocabulary Size (w.o rare words): %d" % len(multi_vocab))
+            type = tokens[7]
+            type_alphabet.add(type)
 
-        if len(vocab_list) > max_vocabulary_size:
-            vocab_list = vocab_list[:max_vocabulary_size]
+    # collect singletons
+    singletons = set([word for word, count in vocab.items() if count <= min_occurrence])
 
-        if data_paths is not None and embedd_dict is not None:
-            expand_vocab()
+    # if a singleton is in pretrained embedding dict, set the count to min_occur + c
+    if embedd_dict is not None:
+        assert isinstance(embedd_dict, OrderedDict)
+        for word in vocab.keys():
+            if word in embedd_dict or word.lower() in embedd_dict:
+                vocab[word] += min_occurrence
 
-        for word in vocab_list:
-            if word in multi_vocab:
-                word_alphabet.add(word)
-            elif word in singletons:
-                word_alphabet.add_singleton(word_alphabet.get_index(word))
-            else:
-                raise ValueError("Error word: " + word)
+    vocab_list = _START_VOCAB + sorted(vocab, key=vocab.get, reverse=True)
+    logger.info("Total Vocabulary Size: %d" % len(vocab_list))
+    logger.info("Total Singleton Size:  %d" % len(singletons))
+    multi_vocab = [word for word in vocab_list if word in _START_VOCAB or vocab[word] > min_occurrence]
+    logger.info("Total Vocabulary Size (w.o rare words): %d" % len(multi_vocab))
 
-        word_alphabet.save(alphabet_directory)
-        char_alphabet.save(alphabet_directory)
-        pos_alphabet.save(alphabet_directory)
-        type_alphabet.save(alphabet_directory)
-    else:
-        word_alphabet.load(alphabet_directory)
-        char_alphabet.load(alphabet_directory)
-        pos_alphabet.load(alphabet_directory)
-        type_alphabet.load(alphabet_directory)
+    if len(vocab_list) > max_vocabulary_size:
+        vocab_list = vocab_list[:max_vocabulary_size]
+
+    if data_paths is not None and embedd_dict is not None:
+        expand_vocab()
+
+    for word in vocab_list:
+        if word in multi_vocab:
+            word_alphabet.add(word)
+        elif word in singletons:
+            word_alphabet.add_singleton(word_alphabet.get_index(word))
+        else:
+            raise ValueError("Error word: " + word)
+
+    # unk refiner
+    unk_refiner = UNKRefiner(level=unk_rank, alphabet=word_alphabet)
+    for words in word_collect:
+        for word, position in words:
+            if word in singletons:
+                unk_signature = unk_refiner.refine(word, position)
+                word_alphabet.add(unk_signature)
 
     word_alphabet.close()
     char_alphabet.close()
