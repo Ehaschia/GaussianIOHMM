@@ -114,6 +114,7 @@ def main():
     parser.add_argument('--decode_cho_grad', type=bool, default=False)
     parser.add_argument('--gaussian_decode', action='store_true')
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
+    parser.add_argument('--sep_normalize', type=float, default=0.0)
 
     args = parser.parse_args()
 
@@ -150,7 +151,7 @@ def main():
     threshold = args.threshold
     normalize_weight = [args.tran_weight, args.input_weight, args.output_weight]
     gaussian_decode = args.gaussian_decode
-
+    sep_normalize = args.sep_normalize
     unk_replace = args.unk_replace
 
     EMISSION_CHO_GRAD = args.emission_cho_grad
@@ -229,10 +230,10 @@ def main():
                 words, labels, masks = data['WORD'].to(device), data['LAB'].to(device), data['MASK'].to(device)
                 loss = 0
                 if threshold >= 1.0:
-                    loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight)
+                    loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight, sep_normalize=sep_normalize)
                 else:
                     for i in range(batch_size):
-                        loss += model.get_loss(words[i], labels[i], masks[i], normalize_weight=normalize_weight)
+                        loss += model.get_loss(words[i], labels[i], masks[i], normalize_weight=normalize_weight, sep_normalize=sep_normalize)
                 # loss = model.get_loss(words, labels, masks)
                 loss.backward()
                 optimizer.step()

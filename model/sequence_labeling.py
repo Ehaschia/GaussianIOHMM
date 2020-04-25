@@ -463,7 +463,7 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         return real_score
 
     def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor,
-                 masks: torch.Tensor, normalize_weight=[0.0, 0.0, 0.0]) -> torch.Tensor:
+                 masks: torch.Tensor, normalize_weight=[0.0, 0.0, 0.0], sep_normalize=0.0) -> torch.Tensor:
         real_score = self.forward(sentences)
         prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels) * masks
         # the loss format can fine tune. According to zechuan's investigation.
@@ -485,7 +485,41 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         else:
             reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg
 
-        return (torch.sum(prob) - reg) / sentences.size(0)
+        if sep_normalize != 0.0:
+            if self.t_comp_num > 1:
+                trans_var = atma(self.transition_cho)
+                sep_tran_score, _, _ = gaussian_multi(self.transition_mu.view(self.t_comp_num, 1, self.dim * 2),
+                                                      self.transition_mu.view(1, self.t_comp_num, 2 * self.dim),
+                                                      trans_var.view(self.t_comp_num, 1, 2 * self.dim, 2 * self.dim),
+                                                      trans_var.view(1, self.t_comp_num, 2 * self.dim, 2 * self.dim))
+                sep_tran_reg = torch.sum(torch.triu(sep_tran_score, diagonal=1))
+            else:
+                sep_tran_reg = 0.0
+
+            if self.i_comp_num > 1:
+                input_var = atma(self.input_cho_embedding.weight)
+                sep_in_score, _, _ = gaussian_multi(self.input_mu_embedding.weight.view(-1, self.i_comp_num, 1, self.dim),
+                                                    self.input_mu_embedding.weight.view(-1, 1, self.i_comp_num, self.dim),
+                                                    input_var.view(-1, self.i_comp_num, 1, self.dim),
+                                                    input_var.view(-1, 1, self.i_comp_num, self.dim))
+                sep_in_reg = torch.sum(torch.triu(sep_in_score, diagonal=1))
+
+            else:
+                sep_in_reg = 0.0
+
+            if self.o_comp_num > 1:
+                output_var = atma(self.output_var)
+                sep_out_score, _, _ = gaussian_multi(self.output_mu.view(self.nlabels, self.o_comp_num, 1, self.dim),
+                                                     self.output_mu.view(self.nlabels, 1, self.o_comp_num, 1, self.dim),
+                                                     output_var.view(self.nlabels, self.o_comp_num, 1, self.dim),
+                                                     output_var.view(self.nlabels, 1, self.o_comp_num, self.dim))
+                sep_out_reg = torch.sum(torch.triu(sep_out_score, diagonal=1))
+            else:
+                sep_out_reg = 0.0
+            seq_reg = sep_normalize * (sep_in_reg + sep_out_reg + sep_tran_reg)
+        else:
+            seq_reg = 0.0
+        return (torch.sum(prob) - reg - seq_reg) / sentences.size(0)
 
     def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor, masks: torch.Tensor) -> Tuple:
         real_score = self.forward(sentences)
@@ -771,8 +805,8 @@ class ThresholdPruningMGSL(nn.Module):
         # shape [batch, len-1, vocab_size]
             return real_score
 
-    def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor,
-                 masks: torch.Tensor, normalize_weight=[0.0, 0.0, 0.0]) -> torch.Tensor:
+    def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor, masks: torch.Tensor,
+                 normalize_weight=[0.0, 0.0, 0.0], sep_normalize=0.0) -> torch.Tensor:
         real_score = self.forward(sentences)
         prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels) * masks
         # the loss format can fine tune. According to zechuan's investigation.
@@ -794,8 +828,41 @@ class ThresholdPruningMGSL(nn.Module):
             reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg + normalize_weight[2] * out_reg
         else:
             reg = normalize_weight[0] * trans_reg + normalize_weight[1] * in_reg
+        if sep_normalize != 0.0:
+            if self.t_comp_num > 1:
+                trans_var = atma(self.transition_cho)
+                sep_tran_score, _, _ = gaussian_multi(self.transition_mu.view(self.t_comp_num, 1, self.dim * 2),
+                                                      self.transition_mu.view(1, self.t_comp_num, 2 * self.dim),
+                                                      trans_var.view(self.t_comp_num, 1, 2 * self.dim, 2 * self.dim),
+                                                      trans_var.view(1, self.t_comp_num, 2 * self.dim, 2 * self.dim))
+                sep_tran_reg = torch.sum(torch.triu(sep_tran_score, diagonal=1))
+            else:
+                sep_tran_reg = 0.0
 
-        return torch.sum(prob) - reg
+            if self.i_comp_num > 1:
+                input_var = atma(self.input_cho_embedding.weight)
+                sep_in_score, _, _ = gaussian_multi(self.input_mu_embedding.weight.view(-1, self.i_comp_num, 1, self.dim),
+                                                    self.input_mu_embedding.weight.view(-1, 1, self.i_comp_num, self.dim),
+                                                    input_var.view(-1, self.i_comp_num, 1, self.dim),
+                                                    input_var.view(-1, 1, self.i_comp_num, self.dim))
+                sep_in_reg = torch.sum(torch.triu(sep_in_score, diagonal=1))
+            else:
+                sep_in_reg = 0.0
+
+            if self.o_comp_num > 1:
+                output_var = atma(self.output_var)
+                sep_out_score, _, _ = gaussian_multi(self.output_mu.view(self.nlabels, self.o_comp_num, 1, self.dim),
+                                                     self.output_mu.view(self.nlabels, 1, self.o_comp_num, 1, self.dim),
+                                                     output_var.view(self.nlabels, self.o_comp_num, 1, self.dim),
+                                                     output_var.view(self.nlabels, 1, self.o_comp_num, self.dim))
+                sep_out_reg = torch.sum(torch.triu(sep_out_score, diagonal=1))
+            else:
+                sep_out_reg = 0.0
+            seq_reg = sep_normalize * (sep_in_reg + sep_out_reg + sep_tran_reg)
+        else:
+            seq_reg = 0.0
+
+        return torch.sum(prob) - reg - seq_reg
 
     def get_acc(self, sentences: torch.Tensor, labels: torch.Tensor,
                 masks: torch.Tensor) -> Tuple:

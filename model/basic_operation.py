@@ -76,7 +76,7 @@ def fast_calculate_zeta(eta: torch.Tensor, lam: torch.Tensor,
 
 
 # multiply two same dimension gaussian
-# Input format should be [batch, dim] and [batch, dim, dim] for mu and var, respectively.
+# Input format should be [..., dim] and [..., dim, dim] for mu and var, respectively.
 def gaussian_multi(mu0: torch.Tensor, mu1: torch.Tensor,
                    var0: torch.Tensor, var1: torch.Tensor,
                    need_zeta=True) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

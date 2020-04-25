@@ -83,7 +83,7 @@ def main():
     parser.add_argument(
         '--data',
         type=str,
-        default='./dataset/ptb/',
+        default='./dataset/uden/',
         help='location of the data corpus')
     parser.add_argument('--batch', type=int, default=256)
     parser.add_argument('--optim', choices=['sgd', 'adam'], default='adam')
@@ -130,6 +130,7 @@ def main():
     parser.add_argument('--decode_cho_grad', type=bool, default=False)
     parser.add_argument('--gaussian_decode', action='store_true')
     parser.add_argument('--analysis', action='store_true')
+    parser.add_argument('--sep_normalize', type=float, default=0.0)
 
     args = parser.parse_args()
 
@@ -167,6 +168,7 @@ def main():
     unk_replace = args.unk_replace
     normalize_weight = [args.tran_weight, args.input_weight, args.output_weight]
     gaussian_decode = args.gaussian_decode
+    sep_normalize = args.sep_normalize
 
     analysis = args.analysis
 
@@ -180,7 +182,7 @@ def main():
     save_parameter_to_json(log_dir, vars(args))
 
     logger = get_logger('Sequence-Labeling')
-    # change_handler(logger, log_dir)
+    change_handler(logger, log_dir)
     # logger = LOGGER
     logger.info(args)
 
@@ -266,10 +268,10 @@ def main():
                 loss = 0.0
                 if threshold >= 1.0:
                     # sentences, labels, masks, revert_order = standardize_batch(samples)
-                    loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight)
+                    loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight, sep_normalize=sep_normalize)
                 else:
                     for i in range(batch_size):
-                        loss += model.get_loss(words[i], labels[i], masks[i], normalize_weight=normalize_weight)
+                        loss += model.get_loss(words[i], labels[i], masks[i], normalize_weight=normalize_weight, sep_normalize=sep_normalize)
                 # loss = model.get_loss(words, labels, masks)
                 loss.backward()
                 optimizer.step()
