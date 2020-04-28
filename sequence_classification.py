@@ -11,7 +11,7 @@ from io_module import sst_data
 from io_module.logger import *
 from io_module.utils import iterate_data
 from model.sequence_classification import *
-from model.weighted_iohmm import WeightIOHMM
+from model.weighted_iohmm import IOHMMClassification
 from optim.lr_scheduler import ExponentialScheduler
 
 # out is [batch, max_len+2]
@@ -207,7 +207,7 @@ def main():
                                      gaussian_decode=gaussian_decode)
 
     # model = RNNSequenceLabeling("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
-    # model = WeightIOHMM(vocab_size=ntokens, nlabel=nlabels, num_state=args.dim)
+    model = IOHMMClassification(vocab_size=ntokens, nlabel=nlabels, num_state=args.dim)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     parameters_need_update = filter(lambda p: p.requires_grad, model.parameters())
@@ -228,13 +228,13 @@ def main():
                 optimizer.zero_grad()
                 # samples = train_dataset[j * batch_size: (j + 1) * batch_size]
                 words, labels, masks = data['WORD'].to(device), data['LAB'].to(device), data['MASK'].to(device)
-                loss = 0
-                if threshold >= 1.0:
-                    loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight, sep_normalize=sep_normalize)
-                else:
-                    for i in range(batch_size):
-                        loss += model.get_loss(words[i], labels[i], masks[i], normalize_weight=normalize_weight, sep_normalize=sep_normalize)
-                # loss = model.get_loss(words, labels, masks)
+                # loss = 0
+                # if threshold >= 1.0:
+                #     loss = model.get_loss(words, labels, masks, normalize_weight=normalize_weight, sep_normalize=sep_normalize)
+                # else:
+                #     for i in range(batch_size):
+                #         loss += model.get_loss(words[i], labels[i], masks[i], normalize_weight=normalize_weight, sep_normalize=sep_normalize)
+                loss = model.get_loss(words, labels, masks)
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
