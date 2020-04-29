@@ -490,13 +490,18 @@ class ThresholdPruningMGSL(nn.Module):
         return corr, pred
 
 
-class RNNSequenceLabeling(nn.Module):
-    def __init__(self, rnn_type, ntokens, nlabels, ninp, nhid, nlayers=1, dropout=0.0, tie_weights=False):
-        super(RNNSequenceLabeling, self).__init__()
+class RNNSequenceClassification(nn.Module):
+    def __init__(self, rnn_type, ntokens, nlabels, ninp, nhid, nlayers=1, dropout=0.0,
+                 tie_weights=False, embedd_word=None):
+        super(RNNSequenceClassification, self).__init__()
         self.ntokens = ntokens + 2
         self.nlabels = nlabels
         self.drop = nn.Dropout(dropout)
-        self.encoder = nn.Embedding(self.ntokens, ninp)
+        if embedd_word is not None:
+            self.encoder = nn.Embedding(self.ntokens, ninp)
+        else:
+            self.encoder = nn.Embedding(self.ntokens, ninp, _weight=embedd_word)
+
         if rnn_type in ['LSTM', 'GRU']:
             self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout, batch_first=True, bidirectional=False)
         else:
