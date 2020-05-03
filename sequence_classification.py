@@ -115,7 +115,8 @@ def main():
     parser.add_argument('--gaussian_decode', action='store_true')
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
     parser.add_argument('--sep_normalize', type=float, default=0.0)
-    parser.add_argument('--embedding', help='path of embedding dict', default='E:/Code/GaussianIOHMM/dataset/glove/glove.840B.300d.txt.gz')
+    # parser.add_argument('--embedding', help='path of embedding dict', default='E:/Code/GaussianIOHMM/dataset/glove/glove.840B.300d.txt.gz')
+    parser.add_argument('--embedding', help='path of embedding dict', default='')
 
     args = parser.parse_args()
 
@@ -179,9 +180,9 @@ def main():
     # Loading data
     logger.info('Load data....')
     alphabet_path = os.path.join(root, 'alphabets')
-    train_path = os.path.join(root, 'plain-train-2')
-    dev_path = os.path.join(root, 'plain-dev-2')
-    test_path = os.path.join(root, 'plain-test-2')
+    train_path = os.path.join(root, 'train-5')
+    dev_path = os.path.join(root, 'dev-5-leaf')
+    test_path = os.path.join(root, 'test-5-leaf')
     word_alphabet = sst_data.create_alphabets(alphabet_path, train_path, data_paths=[dev_path, test_path],
                                               embedd_dict=embedd_dict)
     train_dataset = sst_data.read_bucketed_data(train_path, word_alphabet)
@@ -191,7 +192,7 @@ def main():
 
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     ntokens = word_alphabet.size()
-    nlabels = 2
+    nlabels = 5
 
     # build model
     if threshold >= 1.0:
@@ -216,10 +217,10 @@ def main():
                                      gaussian_decode=gaussian_decode)
 
     # if embedd_dict is None:
-    #     model = RNNSequenceClassification("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=10, nhid=10)
+    #     model = RNNSequenceClassification("LSTM", ntokens=ntokens, nlabels=nlabels, ninp=100, nhid=100, dropout=0.5)
     # else:
-    #     model = RNNSequenceClassification("RNN_TANH", ntokens=ntokens, nlabels=nlabels, ninp=embedd_dim,
-    #                                       nhid=100, embedd_word=embedd_dict)
+    #     model = RNNSequenceClassification("LSTM", ntokens=ntokens, nlabels=nlabels, ninp=embedd_dim,
+    #                                       nhid=100, embedd_word=embedd_dict, dropout=0.5)
     # model = IOHMMClassification(vocab_size=ntokens, nlabel=nlabels, num_state=args.dim)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
@@ -278,7 +279,7 @@ def main():
     #     # flip
     #     parameter.requires_grad = not parameter.requires_grad
 
-    best_epoch = train(best_epoch, thread=30)
+    best_epoch = train(best_epoch, thread=6)
 
     # logger.info("After tunning var. Here we tunning mu")
     #
