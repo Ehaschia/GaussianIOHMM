@@ -183,8 +183,10 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         self.input_cho_dropout = nn.Dropout(in_cho_drop)
 
         self.transition_mu = Parameter(torch.empty(self.t_comp_num, 2 * self.dim), requires_grad=True)
-        self.transition_cho = Parameter(
-            torch.empty(self.t_comp_num, 2 * self.dim, 2 * self.dim), requires_grad=TRANSITION_CHO_GRAD)
+        # self.transition_cho = Parameter(
+        #     torch.empty(self.t_comp_num, 2 * self.dim, 2 * self.dim), requires_grad=TRANSITION_CHO_GRAD)
+
+        self.transition_cho = Parameter(torch.empty(self.t_comp_num, 2 * self.dim), requires_grad=True)
         self.trans_mu_dropout = nn.Dropout(t_mu_drop)
         self.trans_cho_dropout = nn.Dropout(t_cho_drop)
 
@@ -226,8 +228,10 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         if trans_cho_method == 'random':
             nn.init.uniform_(self.transition_cho)
             weight = self.transition_cho.data - 0.5
-            weight = torch.tril(weight)
-            self.transition_cho.data = weight + t_cho_scale * torch.eye(2 * self.dim)
+            # weight = torch.tril(weight)
+            # self.transition_cho.data = weight + t_cho_scale * torch.eye(2 * self.dim).unsqueeze(0)
+            #
+            self.transition_cho.data = weight + t_cho_scale
         elif trans_cho_method == 'wishart':
             transition_var = invwishart.rvs(2 * self.dim, (4 * self.dim + 1) * np.eye(2 * self.dim),
                                             size=self.t_comp_num, random_state=None)
@@ -260,8 +264,10 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         # shape [length, batch, comp, dim]
 
         trans_mu = self.trans_mu_dropout(self.transition_mu).reshape(1, 1, self.t_comp_num, 2 * self.dim)
-        trans_var = atma(self.trans_cho_dropout(self.transition_cho)).reshape(1, 1, self.t_comp_num, 2 * self.dim,
-                                                                              2 * self.dim)
+        # trans_var = atma(self.trans_cho_dropout(self.transition_cho)).reshape(1, 1, self.t_comp_num, 2 * self.dim,
+        #                                                                       2 * self.dim)
+
+        trans_var = torch.diag_embed(self.transition_cho).reshape(1, 1, self.t_comp_num, 2 * self.dim, 2 * self.dim)
 
         # init
         # shape [batch, pre_comp, trans_comp, dim, dim]
@@ -317,8 +323,10 @@ class MixtureGaussianSequenceLabeling(nn.Module):
             swapped_sentences.device)
 
         trans_mu = self.trans_mu_dropout(self.transition_mu).reshape(1, 1, self.t_comp_num, 2 * self.dim)
-        trans_var = atma(self.trans_cho_dropout(self.transition_cho)).reshape(1, 1, self.t_comp_num, 2 * self.dim,
-                                                                              2 * self.dim)
+        # trans_var = atma(self.trans_cho_dropout(self.transition_cho)).reshape(1, 1, self.t_comp_num, 2 * self.dim,
+        #                                                                       2 * self.dim)
+
+        trans_var = torch.diag_embed(self.transition_cho).reshape(1, 1, self.t_comp_num, 2 * self.dim, 2 * self.dim)
 
         part_score, part_mu, part_var = gaussian_multi_integral(trans_mu, init_mu, trans_var, init_var, need_zeta=True,
                                                                 forward=False)
@@ -468,7 +476,9 @@ class MixtureGaussianSequenceLabeling(nn.Module):
         prob = self.criterion(real_score.view(-1, self.nlabels), labels.view(-1)).reshape_as(labels) * masks
         # the loss format can fine tune. According to zechuan's investigation.
         # here our gaussian only trans is non-diagonal. Thus this regularization only suit trans.
-        trans_cho = self.transition_cho.view(-1, 2 * self.dim, 2 * self.dim)
+        # trans_cho = self.transition_cho.view(-1, 2 * self.dim, 2 * self.dim)
+        trans_cho = torch.diag_embed(self.transition_cho).view(-1, 2 * self.dim, 2 * self.dim)
+
         trans_reg = torch.mean(InvWishart.logpdf(trans_cho, 2 * self.dim, (4 * self.dim + 1) * torch.eye(2 * self.dim)))
         if self.input_cho_embedding.weight.requires_grad:
             in_cho = torch.diag_embed(self.input_cho_embedding.weight.reshape(-1, self.i_comp_num, self.dim)).float()

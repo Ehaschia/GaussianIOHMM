@@ -4,21 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
-
-
-def nan_detection(tensor):
-    if torch.sum(torch.isinf(tensor)) != 0:
-        return True
-    if torch.sum(torch.isnan(tensor)) != 0:
-        return True
-    return False
-
-
-# smoothing every list dim by
-def smoothing(tensor, alpha=0.01):
-    mean = torch.mean(tensor, dim=-1, keepdim=True)
-    return (1 - alpha) * tensor + alpha * mean
-
+from model.utils import *
 
 class WeightIOHMM(nn.Module):
 
@@ -27,7 +13,7 @@ class WeightIOHMM(nn.Module):
         self.vocab_size = vocab_size
         self.num_state = num_state
         self.nlabel = nlabel
-        self.input = nn.Embedding(self.vocab_size, self.num_state)
+        self.input = Parameter(torch.empty(self.vocab_size, self.num_state), requires_grad=True)
         self.transition = Parameter(torch.empty(self.num_state, self.num_state), requires_grad=True)
         self.output = Parameter(torch.empty(self.num_state, nlabel), requires_grad=True)
         self.criterion = nn.CrossEntropyLoss(reduction='none')
@@ -42,7 +28,7 @@ class WeightIOHMM(nn.Module):
         # nn.init.uniform_(self.input.weight.data, a=0.0, b=0.15)
         # nn.init.uniform_(self.output.data, a=0.0, b=0.15)
         nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.weight.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
         nn.init.uniform_(self.output.data, a=-0.5, b=0.5)
 
     # shape of bm [1, dim, dim]
@@ -64,7 +50,8 @@ class WeightIOHMM(nn.Module):
         batch, maxlen = sentences.size()
 
         swapped_sentence = sentences.transpose(0, 1)
-        forward_emission = self.logsoftmax(self.input(swapped_sentence.reshape(-1)).reshape(maxlen, batch, self.num_state))
+        norm_input = torch.log_softmax(self.input, dim=0)
+        forward_emission = torch.embedding(swapped_sentence.reshape(-1), norm_input).reshape(maxlen, batch, self.num_state)
         forward_transition = self.logsoftmax(self.transition.unsqueeze(0))
         # forward
         forwards = [forward_emission[0]]
@@ -129,7 +116,7 @@ class IOHMMClassification(nn.Module):
         self.vocab_size = vocab_size
         self.num_state = num_state
         self.nlabel = nlabel
-        self.input = nn.Embedding(self.vocab_size, self.num_state)
+        self.input = Parameter(torch.empty(self.vocab_size, self.num_state), requires_grad=True)
         self.transition = Parameter(torch.empty(self.num_state, self.num_state), requires_grad=True)
         self.output = Parameter(torch.empty(nlabel, self.num_state), requires_grad=True)
         self.criterion = nn.CrossEntropyLoss(reduction='none')
@@ -144,7 +131,7 @@ class IOHMMClassification(nn.Module):
         # nn.init.uniform_(self.input.weight.data, a=0.0, b=0.15)
         # nn.init.uniform_(self.output.data, a=0.0, b=0.15)
         nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.weight.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
         nn.init.uniform_(self.output.data, a=-0.5, b=0.5)
 
     # shape of bm [1, dim, dim]
@@ -166,8 +153,9 @@ class IOHMMClassification(nn.Module):
         batch, maxlen = sentences.size()
 
         swapped_sentence = sentences.transpose(0, 1)
-        forward_emission = self.logsoftmax(self.input(swapped_sentence.reshape(-1)).reshape(maxlen, batch, self.num_state))
-        forward_transition = self.logsoftmax(self.transition.unsqueeze(0))
+        norm_embeding = torch.log_softmax(self.input, dim=0)
+        forward_emission = self.logsoftmax(torch.embedding(swapped_sentence.view(-1), norm_embeding).view(maxlen, batch, self.num_state))
+        forward_transition = self.logsoftmax(self.transition).unsqueeze(0)
         # forward
         forwards = [forward_emission[0]]
         # forwards = [self.tanh(forward_emission[0])]

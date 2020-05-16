@@ -1,11 +1,10 @@
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.nn import Parameter
 # in order to use the global variable
 from global_variables import *
 from model.basic_operation import *
 from scipy.stats import invwishart
-
+from model.utils import *
 
 class LanguageModel(nn.Module):
 
@@ -50,29 +49,22 @@ class GaussianBatchLanguageModel(LanguageModel):
 
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
-        reset_embedding(mu_embedding, self.emission_mu_embedding, self.dim, True,
-                        far_init=FAR_EMISSION_MU)
-        reset_embedding(var_embedding, self.emission_cho_embedding, self.dim, EMISSION_CHO_GRAD,
-                        far_init=False)
+        reset_embedding(mu_embedding, self.emission_mu_embedding, self.dim, True)
+        reset_embedding(var_embedding, self.emission_cho_embedding, self.dim, EMISSION_CHO_GRAD)
         self.reset_parameter(init_var_scale)
 
     def reset_parameter(self, init_var_scale):
-        if FAR_TRANSITION_MU:
-            nn.init.uniform_(self.transition_mu, a=-1.0, b=1.0)
-        else:
-            to_init_transition_mu = self.transition_mu.unsqueeze(0)
-            nn.init.xavier_normal_(to_init_transition_mu)
-            self.transition_mu.data = to_init_transition_mu.squeeze(0)
+        to_init_transition_mu = self.transition_mu.unsqueeze(0)
+        nn.init.xavier_normal_(to_init_transition_mu)
+        self.transition_mu.data = to_init_transition_mu.squeeze(0)
         # here the init of transition var should be alert
         nn.init.uniform_(self.transition_cho)
         weight = self.transition_cho.data - 0.5
         # maybe here we need to add some
         weight = torch.tril(weight)
         self.transition_cho.data = weight + init_var_scale * torch.eye(2 * self.dim)
-        if FAR_DECODE_MU:
-            nn.init.uniform_(self.decoder_mu, a=-1.0, b=1.0)
-        else:
-            nn.init.xavier_normal_(self.decoder_mu)
+
+        nn.init.xavier_normal_(self.decoder_mu)
         nn.init.uniform_(self.decoder_cho)
 
         # var_weight = self.decoder_var.data
@@ -148,19 +140,15 @@ class MixtureGaussianBatchLanguageModel(LanguageModel):
 
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
-        reset_embedding(mu_embedding, self.input_mu_embedding, self.dim, True,
-                        far_init=FAR_EMISSION_MU)
-        reset_embedding(var_embedding, self.input_cho_embedding, self.dim, EMISSION_CHO_GRAD,
-                        far_init=False)
+        reset_embedding(mu_embedding, self.input_mu_embedding, self.dim, True)
+        reset_embedding(var_embedding, self.input_cho_embedding, self.dim, EMISSION_CHO_GRAD)
         self.reset_parameter(init_var_scale=init_var_scale)
 
     def reset_parameter(self, trans_var_init='raw', init_var_scale=1.0):
-        if FAR_TRANSITION_MU:
-            nn.init.uniform_(self.transition_mu, a=-1.0, b=1.0)
-        else:
-            to_init_transition_mu = self.transition_mu.unsqueeze(0)
-            nn.init.xavier_normal_(to_init_transition_mu)
-            self.transition_mu.data = to_init_transition_mu.squeeze(0)
+
+        to_init_transition_mu = self.transition_mu.unsqueeze(0)
+        nn.init.xavier_normal_(to_init_transition_mu)
+        self.transition_mu.data = to_init_transition_mu.squeeze(0)
         if trans_var_init == 'raw':
             # here the init of var should be alert
             nn.init.uniform_(self.transition_cho)
@@ -175,10 +163,7 @@ class MixtureGaussianBatchLanguageModel(LanguageModel):
             self.transition_cho.data = torch.from_numpy(np.linalg.cholesky(transition_var))
         else:
             raise ValueError("Error transition init method")
-        if FAR_DECODE_MU:
-            nn.init.uniform_(self.decoder_mu, a=-1.0, b=1.0)
-        else:
-            nn.init.xavier_normal_(self.output_mu)
+        nn.init.xavier_normal_(self.output_mu)
         nn.init.uniform_(self.output_cho)
 
     # ALERT this method just used for unit test
@@ -242,7 +227,7 @@ class MixtureGaussianBatchLanguageModel(LanguageModel):
                                                                    inside_mu.reshape(batch, -1, self.dim),
                                                                    inside_var.reshape(batch, -1, self.dim, self.dim),
                                                                    k=self.max_comp)
-            # TODO deal with not enough component
+
             holder_score.append(prev_score)
             holder_mu.append(prev_mu)
             holder_var.append(prev_var)
@@ -271,7 +256,7 @@ class MixtureGaussianBatchLanguageModel(LanguageModel):
 class RNNLanguageModel(LanguageModel):
     def __init__(self, rnn_type, ntokens, ninp, nhid, nlayers=1, dropout=0.0, tie_weights=False):
         super(RNNLanguageModel, self).__init__()
-        self.ntokens = ntokens + 2
+        self.ntokens = ntokens
         self.drop = nn.Dropout(dropout)
         self.encoder = nn.Embedding(self.ntokens, ninp)
         if rnn_type in ['LSTM', 'GRU']:
@@ -303,10 +288,74 @@ class RNNLanguageModel(LanguageModel):
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
-    def forward(self, sentences: torch.Tensor, masks: torch.Tensor):
+    def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor):
         emb = self.drop(self.encoder(sentences))
         packed_emb = nn.utils.rnn.pack_padded_sequence(emb, masks.sum(dim=1), batch_first=True, enforce_sorted=False)
         packed_output, hidden = self.rnn(packed_emb)
         output, _ = nn.utils.rnn.pad_packed_sequence(packed_output, batch_first=True)
         decoded = self.decoder(self.drop(output))
-        return decoded
+        ppl = self.criterion(decoded.view(-1, self.ntokens), sentences.view(-1))
+        return torch.sum(ppl) / sentences.size(0)
+
+
+class HMMLanguageModel(LanguageModel):
+    def __init__(self, vocab_size, num_state=10):
+        super(HMMLanguageModel, self).__init__()
+        self.vocab_size = vocab_size
+        self.num_state = num_state
+        # self.input = nn.Embedding(self.vocab_size, self.num_state)
+        self.input = Parameter(torch.empty(self.vocab_size, self.num_state), requires_grad=True)
+        self.transition = Parameter(torch.empty(self.num_state, self.num_state), requires_grad=True)
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
+        self.logsoftmax1 = nn.LogSoftmax(dim=-1)
+        self.logsoftmax0 = nn.LogSoftmax(dim=0)
+
+        # TODO try this
+        # self.adaptivelogsm = nn.AdaptiveLogSoftmaxWithLoss()
+        self.reset_parameter()
+
+    def reset_parameter(self):
+        nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
+
+    @staticmethod
+    def bmv_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-2), dim=-1)
+
+    @staticmethod
+    def bmm_log_product(bm1, bm2):
+        return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
+
+    def smooth_parameters(self):
+        self.input.data = smoothing(self.input.data)
+        self.transition.data = smoothing(self.transition.data)
+        self.output.data = smoothing(self.output.data)
+
+    def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        batch, maxlen = sentences.size()
+
+        swapped_sentence = sentences.transpose(0, 1)
+        norm_input = self.logsoftmax0(self.input)
+        forward_emission = F.embedding(swapped_sentence.reshape(-1), norm_input).reshape(maxlen, batch, self.num_state)
+        forward_transition = self.logsoftmax1(self.transition.unsqueeze(0))
+        # forward
+        forwards = [forward_emission[0]]
+        # forwards = [self.tanh(forward_emission[0])]
+        for i in range(1, maxlen):
+            pre_forward = forwards[i - 1]
+            current_forward = self.bmv_log_product(forward_transition, pre_forward)
+            forwards.append(current_forward + forward_emission[i])
+            # current_forward = torch.matmul(forward_transition, pre_forward.unsqueeze(-1)).squeeze(-1)
+            # forwards.append(current_forward * forward_emission[i])
+        # shape [batch, max_len, dim]
+        hidden_states = torch.stack(forwards)
+
+        # shape [batch, label]
+        ppl = torch.sum(torch.logsumexp(hidden_states, dim=-1).transpose(0, 1) * masks)
+        # score = torch.matmul(expected_count, self.output.unsqueeze(0))
+        # nan_detection(score)
+        return ppl
+
+    def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        ppl = self.forward(sentences, masks)
+        return -1.0 * ppl / masks.size(0)
