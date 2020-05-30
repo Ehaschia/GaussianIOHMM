@@ -349,12 +349,13 @@ class HMMLanguageModel(LanguageModel):
             # forwards.append(current_forward * forward_emission[i])
         # shape [batch, max_len, dim]
         hidden_states = torch.stack(forwards)
-
+        ends = torch.cat((masks[:, 1:], torch.zeros(batch, 1).to(sentences.device)), dim=1).unsqueeze(-1)
+        ppl = torch.logsumexp(hidden_states.transpose(0, 1) * ends, dim=2)
         # shape [batch, label]
-        ppl = torch.sum(torch.logsumexp(hidden_states, dim=-1).transpose(0, 1) * masks)
+        # ppl = torch.sum(torch.logsumexp(hidden_states, dim=-1).transpose(0, 1) * masks)
         # score = torch.matmul(expected_count, self.output.unsqueeze(0))
         # nan_detection(score)
-        return ppl
+        return torch.sum(ppl)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
