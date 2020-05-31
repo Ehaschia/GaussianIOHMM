@@ -349,8 +349,9 @@ class HMMLanguageModel(LanguageModel):
             # forwards.append(current_forward * forward_emission[i])
         # shape [batch, max_len, dim]
         hidden_states = torch.stack(forwards)
-        ends = torch.cat((masks[:, 1:], torch.zeros(batch, 1).to(sentences.device)), dim=1).unsqueeze(-1)
-        ppl = torch.logsumexp(hidden_states.transpose(0, 1) * ends, dim=2)
+        length = torch.sum(masks, dim=-1).long()
+        forward_scores = hidden_states[length-1, torch.arange(batch)]
+        ppl = torch.logsumexp(forward_scores, dim=-1)
         # shape [batch, label]
         # ppl = torch.sum(torch.logsumexp(hidden_states, dim=-1).transpose(0, 1) * masks)
         # score = torch.matmul(expected_count, self.output.unsqueeze(0))
