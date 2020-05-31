@@ -18,16 +18,17 @@ def evaluate(data, batch, model, device):
     model.eval()
 
     total_ppl = 0
-    cnt = 0
+    word_cnt = 0
     with torch.no_grad():
         for batch_data in iterate_data(data, batch):
             # sentences, labels, masks, revert_order = standardize_batch(data[i * batch: (i + 1) * batch])
             words = batch_data['WORD'].to(device)
             masks = batch_data['MASK'].to(device)
+            lengths = batch_data['LENGTH']
             ppl = model.get_loss(words, masks)
             total_ppl += ppl.item() * words.size(0)
-            cnt += words.size(0)
-    return total_ppl / cnt
+            word_cnt += torch.sum(lengths).item()
+    return total_ppl / word_cnt
 
 
 def get_optimizer(parameters, optim, learning_rate, amsgrad, weight_decay, lr_decay, warmup_steps):
@@ -197,8 +198,8 @@ def main():
 
     with open(log_dir + '/' + 'result.json', 'w') as f:
         final_result = {"Epoch": best_epoch[0],
-                        "Dev": best_epoch[1] * 100,
-                        "Test": best_epoch[2] * 100}
+                        "Dev": best_epoch[1],
+                        "Test": best_epoch[2]}
         json.dump(final_result, f)
 
 
