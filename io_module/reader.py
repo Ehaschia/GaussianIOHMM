@@ -78,7 +78,7 @@ class CoNLLXReader(object):
             type = tokens[7]
 
             words.append(word)
-            # word_ids.append(self.__word_alphabet.get_index(word))
+            word_ids.append(self.__word_alphabet.get_index(word))
 
             postags.append(pos)
             pos_ids.append(self.__pos_alphabet.get_index(pos))
@@ -100,15 +100,12 @@ class CoNLLXReader(object):
             heads.append(0)
 
         for position, word in enumerate(words):
+            # TODO here the position is not correct
             if self.refine_unk:
                 word_idx = self.__word_alphabet.get_index(word)
                 if word_idx < 0:
                     unk_signature = self.refiner.refine(word, position)
-                    word_ids.append(self.__word_alphabet.get_index(unk_signature))
-                else:
-                    word_ids.append(self.__word_alphabet.get_index(word))
-            else:
-                word_ids.append(self.__word_alphabet.get_index(word))
+                    word_ids[position] = self.__word_alphabet.get_index(unk_signature)
 
         return DependencyInstance(Sentence(words, word_ids, char_seqs, char_id_seqs), postags, pos_ids, heads, types, type_ids)
 

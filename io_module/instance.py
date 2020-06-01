@@ -11,7 +11,7 @@ class Sentence(object):
         self.char_id_seqs = char_id_seqs
 
     def length(self):
-        return len(self.words)
+        return len(self.word_ids)
 
 
 class DependencyInstance(object):
