@@ -131,7 +131,7 @@ def main():
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     ntokens = word_alphabet.size()
 
-    if model_type is not 'HMM':
+    if model_type != 'HMM':
         model = RNNLanguageModel(model_type, ntokens=ntokens, ninp=dim, nhid=dim, dropout=0.5)
     else:
         model = HMMLanguageModel(vocab_size=ntokens, num_state=dim)
