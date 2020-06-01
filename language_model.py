@@ -47,7 +47,6 @@ def save_parameter_to_json(path, parameters):
         json.dump(parameters, f)
 
 
-
 def main():
     parser = argparse.ArgumentParser(description="Gaussian Input Output HMM")
 
@@ -56,7 +55,7 @@ def main():
         type=str,
         default='./dataset/ptb/',
         help='location of the data corpus')
-    parser.add_argument('--batch', type=int, default=100)
+    parser.add_argument('--batch', type=int, default=50)
     parser.add_argument('--optim', choices=['sgd', 'adam'], default='adam')
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--lr_decay', type=float, default=0.999995, help='Decay rate of learning rate')
@@ -70,6 +69,7 @@ def main():
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
+    parser.add_argument('--model', choices=['HMM', 'RNN_TANH', 'RNN_RELU', 'LSTM'], default='LSTM')
 
     args = parser.parse_args()
 
@@ -81,17 +81,20 @@ def main():
 
     # setting optimizer
     optim = args.optim
-    batch_size = args.batch
-    # optim = 'sgd'
     lr = args.lr
     lr_decay = args.lr_decay
     warmup_steps = args.warmup_steps
     amsgrad = args.amsgrad
     weight_decay = args.weight_decay
 
+    # data
     root = args.data
-
     unk_replace = args.unk_replace
+
+    # model
+    model_type = args.model
+    dim = args.dim
+    batch_size = args.batch
 
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -103,7 +106,7 @@ def main():
     # logger = LOGGER
     logger.info(args)
 
-    device = torch.device('cuda') # if args.gpu else torch.device('cpu')
+    device = torch.device('cuda')  # if args.gpu else torch.device('cpu')
 
     # Loading data
     logger.info('Load PTB data....')
@@ -117,16 +120,21 @@ def main():
                                                                                              max_vocabulary_size=1e5,
                                                                                              min_occurrence=1)
 
-    train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
+    train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
+                                                   symbolic_root=(model_type != 'HMM'), symbolic_end=(model_type != 'HMM'))
     num_data = sum(train_dataset[1])
-    dev_dataset = conllx_data.read_data(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
-    test_dataset = conllx_data.read_data(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
+    dev_dataset = conllx_data.read_data(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
+                                        symbolic_root=(model_type != 'HMM'), symbolic_end=(model_type != 'HMM'))
+    test_dataset = conllx_data.read_data(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
+                                        symbolic_root=(model_type != 'HMM'), symbolic_end=(model_type != 'HMM'))
 
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     ntokens = word_alphabet.size()
 
-    # model = RNNLanguageModel("LSTM", ntokens=ntokens, ninp=args.dim, nhid=args.dim, dropout=0.5)
-    model = HMMLanguageModel(vocab_size=ntokens, num_state=args.dim)
+    if model_type is not 'HMM':
+        model = RNNLanguageModel(model_type, ntokens=ntokens, ninp=dim, nhid=dim, dropout=0.5)
+    else:
+        model = HMMLanguageModel(vocab_size=ntokens, num_state=dim)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     parameters_need_update = filter(lambda p: p.requires_grad, model.parameters())
@@ -157,7 +165,6 @@ def main():
                 epoch_loss += loss.item() * words.size(0)
                 num_words += torch.sum(masks).item()
                 num_insts += words.size()[0]
-
 
                 if step % 10 == 0:
                     torch.cuda.empty_cache()

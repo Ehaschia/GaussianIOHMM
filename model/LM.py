@@ -289,13 +289,15 @@ class RNNLanguageModel(LanguageModel):
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor):
+        batch, max_length = sentences.size()
         emb = self.drop(self.encoder(sentences))
         packed_emb = nn.utils.rnn.pack_padded_sequence(emb, masks.sum(dim=1), batch_first=True, enforce_sorted=False)
         packed_output, hidden = self.rnn(packed_emb)
         output, _ = nn.utils.rnn.pad_packed_sequence(packed_output, batch_first=True)
         decoded = self.decoder(self.drop(output))
-        ppl = self.criterion(decoded.view(-1, self.ntokens), sentences.view(-1))
-        return torch.sum(ppl) / sentences.size(0)
+        ppl = self.criterion(decoded[:, :-1].reshape(-1, self.ntokens), sentences[:, 1:].reshape(-1)).reshape(batch, max_length-1)
+        ppl_masked = ppl * masks[:, :-1]
+        return torch.sum(ppl_masked) / sentences.size(0)
 
 
 class HMMLanguageModel(LanguageModel):
