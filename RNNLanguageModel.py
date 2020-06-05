@@ -69,7 +69,9 @@ def main():
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
-    # parser.add_argument('--model', choices=['HMM', 'holder'], default='HMM')
+    parser.add_argument('--model', choices=['RNN_TANH', 'RNN_RELU', 'LSTM', 'GRU', 'MultiplicativeRNN'], default='MultiplicativeRNN')
+    parser.add_argument('--active', choices=['sigmoid', 'tanh', 'relu'], default='sigmoid')
+    parser.add_argument('--dropout', type=float, default=0.0)
 
     args = parser.parse_args()
 
@@ -92,21 +94,23 @@ def main():
     unk_replace = args.unk_replace
 
     # model
-    # model_type = args.model
+    model_type = args.model
     dim = args.dim
     batch_size = args.batch
+    active_func = args.active
+    dropout = args.dropout
 
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     # save parameter
     save_parameter_to_json(log_dir, vars(args))
 
-    logger = get_logger('Sequence-Labeling')
+    logger = get_logger('LanguageModel')
     change_handler(logger, log_dir)
     # logger = LOGGER
     logger.info(args)
 
-    device = torch.device('cuda')  # if args.gpu else torch.device('cpu')
+    device = torch.device('cuda') # if args.gpu else torch.device('cpu')
 
     # Loading data
     logger.info('Load PTB data....')
@@ -131,7 +135,13 @@ def main():
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     ntokens = word_alphabet.size()
 
-    model = HMMLanguageModel(vocab_size=ntokens, num_state=dim)
+    if model_type in ['LSTM', 'RNN_TANH', 'RNN_RELU', 'GRU']:
+        model = RNNLanguageModel(model_type, ntokens=ntokens, ninp=dim, nhid=dim, dropout=dropout)
+    elif model_type == 'MultiplicativeRNN':
+        model = MultiplicativeRNN(active_func, ntokens=ntokens, ninp=dim, nhid=dim, dropout=dropout)
+    else:
+        raise ValueError("Error model type")
+
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     parameters_need_update = filter(lambda p: p.requires_grad, model.parameters())

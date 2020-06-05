@@ -363,3 +363,134 @@ class HMMLanguageModel(LanguageModel):
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
         return -1.0 * ppl / masks.size(0)
+
+# Weighted IOHMM for language model
+# aka deterministic hmm
+# if tie, it is another format HMM
+# TODO
+class IOHMMLanguageModel(nn.Module):
+    def __init__(self, vocab_size, num_state=10, tie=False):
+        super(IOHMMLanguageModel, self).__init__()
+        self.vocab_size = vocab_size
+        self.num_state = num_state
+        self.input = Parameter(torch.empty(self.vocab_size, self.num_state), requires_grad=True)
+        self.transition = Parameter(torch.empty(self.num_state, self.num_state), requires_grad=True)
+        self.output = Parameter(torch.empty(vocab_size, self.num_state), requires_grad=True)
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
+        self.logsoftmax = nn.LogSoftmax(dim=-1)
+        self.reset_parameter()
+
+    def reset_parameter(self):
+        # nn.init.uniform_(self.transition.data, a=-0.1, b=1.0)
+        # nn.init.uniform_(self.input.weight.data, a=-0.15, b=0.15)
+        # nn.init.uniform_(self.output.data, a=-0.15, b=0.15)
+        # nn.init.uniform_(self.transition.data, a=0.0, b=0.15)
+        # nn.init.uniform_(self.input.weight.data, a=0.0, b=0.15)
+        # nn.init.uniform_(self.output.data, a=0.0, b=0.15)
+        nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.output.data, a=-0.5, b=0.5)
+
+    # shape of bm [1, dim, dim]
+    # shape of bv [batch, dim]
+    @staticmethod
+    def bmv_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-2), dim=-1)
+
+    @staticmethod
+    def bmm_log_product(bm1, bm2):
+        return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
+
+    def smooth_parameters(self):
+        self.input.weight.data = smoothing(self.input.weight.data)
+        self.transition.data = smoothing(self.transition.data)
+        self.output.data = smoothing(self.output.data)
+
+    def forward(self, sentences: torch.Tensor, length: torch.Tensor) -> torch.Tensor:
+        batch, maxlen = sentences.size()
+
+        swapped_sentence = sentences.transpose(0, 1)
+        norm_embeding = torch.log_softmax(self.input, dim=0)
+        forward_emission = self.logsoftmax(torch.embedding(swapped_sentence.view(-1), norm_embeding).view(maxlen, batch, self.num_state))
+        forward_transition = self.logsoftmax(self.transition).unsqueeze(0)
+        # forward
+        forwards = [forward_emission[0]]
+        # forwards = [self.tanh(forward_emission[0])]
+        for i in range(1, maxlen):
+            pre_forward = forwards[i - 1]
+            current_forward = self.bmv_log_product(forward_transition, pre_forward)
+            forwards.append(current_forward + forward_emission[i])
+            # current_forward = torch.matmul(forward_transition, pre_forward.unsqueeze(-1)).squeeze(-1)
+            # forwards.append(current_forward * forward_emission[i])
+        # shape [batch, dim]
+        hidden_states = torch.stack(forwards)[length-1, torch.arange(batch), :]
+
+        # shape [batch, label]
+        score = self.bmv_log_product(self.logsoftmax(self.output.unsqueeze(0)), hidden_states)
+        # score = torch.matmul(expected_count, self.output.unsqueeze(0))
+        # nan_detection(score)
+        return score
+
+    def get_loss(self, sentences: torch.Tensor, labels: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        length = torch.sum(masks, dim=-1).long()
+        score = self.forward(sentences, length)
+        # prob = self.criterion(score.reshape(-1, self.nlabel), labels.view(-1)).reshape_as(labels) * masks
+        prob = score * nn.functional.one_hot(labels, num_classes=self.nlabel)
+        return -1.0 * torch.sum(prob) / sentences.size(0)
+
+
+class MultiplicativeRNN(nn.Module):
+    def __init__(self, rnn_type, ntokens, ninp, nhid, dropout=0.0, tie_weights=False):
+        super(MultiplicativeRNN, self).__init__()
+        self.ntokens = ntokens
+        self.drop = nn.Dropout(dropout)
+        self.encoder = nn.Embedding(self.ntokens, ninp)
+
+        self.W = Parameter(torch.empty(nhid, nhid), requires_grad=True)
+
+        self.decoder = nn.Linear(nhid, self.ntokens)
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
+
+        if tie_weights:
+            if nhid != ninp:
+                raise ValueError('When using the tied flag, nhid must be equal to emsize')
+            self.decoder.weight = self.encoder.weight
+
+        self.init_weights()
+        self.rnn_type = rnn_type
+        self.nhid = nhid
+
+        # activate function
+        if rnn_type == 'sigmoid':
+            self.active_func = nn.Sigmoid()
+        elif rnn_type == 'tanh':
+            self.active_func = nn.Tanh()
+        elif rnn_type == 'relu':
+            self.active_func = nn.ReLU()
+        else:
+            raise ValueError('Error activate function')
+
+    def init_weights(self):
+        initrange = 0.1
+        self.encoder.weight.data.uniform_(-initrange, initrange)
+        self.W.data.uniform_(-initrange, initrange)
+        self.decoder.bias.data.zero_()
+        self.decoder.weight.data.uniform_(-initrange, initrange)
+
+    def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor):
+        batch, max_length = sentences.size()
+        emb = self.drop(self.encoder(sentences))
+
+        pre = self.active_func(emb[:, 0])
+        output = [pre]
+        W = self.W.unsqueeze(0).expand([batch, self.nhid, self.nhid])
+        for i in range(1, max_length):
+            inp_emb = emb[:, i]
+            mid = torch.bmm(W, pre.unsqueeze(-1)).squeeze(-1)
+            pre = self.active_func(mid * inp_emb)
+            output.append(pre)
+        output = torch.stack(output)
+        decoded = self.decoder(self.drop(output)).transpose(0, 1)
+        ppl = self.criterion(decoded[:, :-1].reshape(-1, self.ntokens), sentences[:, 1:].reshape(-1)).reshape(batch, max_length-1)
+        ppl_masked = ppl * masks[:, :-1]
+        return torch.sum(ppl_masked) / sentences.size(0)
