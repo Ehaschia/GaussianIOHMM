@@ -69,7 +69,7 @@ def main():
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
-    parser.add_argument('--model', choices=['HMM', 'RNN_TANH', 'RNN_RELU', 'LSTM'], default='LSTM')
+    parser.add_argument('--model', choices=['HMM', 'RNN_TANH', 'RNN_RELU', 'LSTM', 'GRU'], default='HMM')
 
     args = parser.parse_args()
 
@@ -121,20 +121,22 @@ def main():
                                                                                              min_occurrence=1)
 
     train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
-                                                   symbolic_root=(model_type != 'HMM'), symbolic_end=(model_type != 'HMM'))
+                                                   symbolic_root=True, symbolic_end=True)
     num_data = sum(train_dataset[1])
     dev_dataset = conllx_data.read_data(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
-                                        symbolic_root=(model_type != 'HMM'), symbolic_end=(model_type != 'HMM'))
+                                        symbolic_root=True, symbolic_end=True)
     test_dataset = conllx_data.read_data(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
-                                        symbolic_root=(model_type != 'HMM'), symbolic_end=(model_type != 'HMM'))
+                                         symbolic_root=True, symbolic_end=True)
 
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     ntokens = word_alphabet.size()
 
-    if model_type != 'HMM':
+    if model_type in ['LSTM', 'RNN_TANH', 'RNN_RELU', 'GRU']:
         model = RNNLanguageModel(model_type, ntokens=ntokens, ninp=dim, nhid=dim, dropout=0.5)
-    else:
+    elif model_type == 'HMM':
         model = HMMLanguageModel(vocab_size=ntokens, num_state=dim)
+    else:
+        raise ValueError("Error model type")
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     parameters_need_update = filter(lambda p: p.requires_grad, model.parameters())
