@@ -12,7 +12,7 @@ from io_module.utils import iterate_data
 from model.LM import *
 # from misc.sharp_detect import SharpDetector
 from optim.lr_scheduler import ExponentialScheduler
-
+from model.hmm2rnn import *
 
 def evaluate(data, batch, model, device):
     model.eval()
@@ -69,7 +69,8 @@ def main():
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
-    # parser.add_argument('--model', choices=['HMM', 'holder'], default='HMM')
+    parser.add_argument('--model', choices=['HMM', 'HMM1'], default='HMM')
+    parser.add_argument('--symbolic', type=bool, default=True)
 
     args = parser.parse_args()
 
@@ -90,9 +91,10 @@ def main():
     # data
     root = args.data
     unk_replace = args.unk_replace
+    symbolic = args.symbolic
 
     # model
-    # model_type = args.model
+    model_type = args.model
     dim = args.dim
     batch_size = args.batch
 
@@ -121,17 +123,23 @@ def main():
                                                                                              min_occurrence=1)
 
     train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
-                                                   symbolic_root=True, symbolic_end=True)
+                                                   symbolic_root=symbolic, symbolic_end=symbolic)
     num_data = sum(train_dataset[1])
     dev_dataset = conllx_data.read_data(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
-                                        symbolic_root=True, symbolic_end=True)
+                                        symbolic_root=symbolic, symbolic_end=symbolic)
     test_dataset = conllx_data.read_data(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
-                                         symbolic_root=True, symbolic_end=True)
+                                         symbolic_root=symbolic, symbolic_end=symbolic)
 
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     ntokens = word_alphabet.size()
 
-    model = HMMLanguageModel(vocab_size=ntokens, num_state=dim)
+    if model_type == 'HMM':
+        model = HMMLanguageModel(vocab_size=ntokens, num_state=dim)
+    elif model_type == 'HMM1':
+        model = HMM(vocab_size=ntokens, num_state=dim)
+    else:
+        raise ValueError('Error model type')
+
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     parameters_need_update = filter(lambda p: p.requires_grad, model.parameters())
