@@ -69,8 +69,9 @@ def main():
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
-    parser.add_argument('--model', choices=['HMM', 'HMM1', 'TBHMM', 'ABHMM', 'GBHMM', 'DTHMM', 'DEHMM', 'SNLHMM'], default='SNLHMM')
-    parser.add_argument('--symbolic', type=bool, default=False)
+    parser.add_argument('--model', choices=['HMM', 'HMM1', 'TBHMM', 'ABHMM', 'GBHMM', 'DTHMM', 'DEHMM', 'SNLHMM'], default='TBHMM')
+    parser.add_argument('--symbolic_start', type=bool, default=False)
+    parser.add_argument('--symbolic_end', type=bool, default=False)
 
     args = parser.parse_args()
 
@@ -91,7 +92,8 @@ def main():
     # data
     root = args.data
     unk_replace = args.unk_replace
-    symbolic = args.symbolic
+    s_start = args.symbolic_start
+    s_end = args.symbolic_end
 
     # model
     model_type = args.model
@@ -123,12 +125,12 @@ def main():
                                                                                              min_occurrence=1)
 
     train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
-                                                   symbolic_root=symbolic, symbolic_end=symbolic)
+                                                   symbolic_root=s_start, symbolic_end=s_end)
     num_data = sum(train_dataset[1])
     dev_dataset = conllx_data.read_data(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
-                                        symbolic_root=symbolic, symbolic_end=symbolic)
+                                        symbolic_root=s_start, symbolic_end=s_end)
     test_dataset = conllx_data.read_data(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
-                                         symbolic_root=symbolic, symbolic_end=symbolic)
+                                         symbolic_root=s_start, symbolic_end=s_end)
 
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     ntokens = word_alphabet.size()
