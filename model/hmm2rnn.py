@@ -36,7 +36,7 @@ class HMM(nn.Module):
 
     # log format normalize
     def log_normalize(self, t):
-        return self.logsoftmax0(t)
+        return self.logsoftmax1(t)
 
     def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         batch, maxlen = sentences.size()
@@ -51,10 +51,7 @@ class HMM(nn.Module):
         forward_transition = self.logsoftmax1(self.transition.unsqueeze(0))
 
         # s_0
-        forward = self.logsoftmax0(self.begin).expand([batch, self.num_state])
-
-        # forward
-        current_mid = self.bmv_log_product(forward_transition, forward)
+        current_mid = self.logsoftmax0(self.begin).expand([batch, self.num_state])
         mid_forwards = [current_mid]
         for i in range(0, maxlen-1):
             # c_i-1
@@ -105,7 +102,7 @@ class TBHMM(nn.Module):
 
     # log format normalize
     def log_normalize(self, t):
-        return self.logsoftmax0(t)
+        return self.logsoftmax1(t)
 
     def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         batch, maxlen = sentences.size()
@@ -131,7 +128,7 @@ class TBHMM(nn.Module):
             current_forward = self.log_normalize(pre_forward + log_e[i])
             # c_i
             current_mid = self.logsoftmax1(torch.matmul(forward_transition, torch.exp(log_e[i].view(batch, 1, self.num_state, 1))).squeeze(-1))
-            current_mid = self.bmv_log_product(current_mid, current_forward)
+            current_mid = torch.logsumexp(current_mid + current_forward.unsqueeze(-1), dim=-2)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
         hidden_states = torch.stack(mid_forwards)
@@ -178,7 +175,7 @@ class ABHMM(nn.Module):
 
     # log format normalize
     def log_normalize(self, t):
-        return self.logsoftmax0(t)
+        return self.logsoftmax1(t)
 
     def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         batch, maxlen = sentences.size()
@@ -203,7 +200,7 @@ class ABHMM(nn.Module):
             # s_i
             current_forward = self.log_normalize(pre_forward + log_e[i])
             # c_i
-            current_mid = self.logsoftmax1(self.emission_transition(torch.exp(log_e[i])).unsqueeze(2) + forward_transition)
+            current_mid = self.logsoftmax1(self.emission_transition(torch.exp(log_e[i])).unsqueeze(-2) + forward_transition)
             current_mid = self.bmv_log_product(current_mid, current_forward)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
@@ -321,7 +318,7 @@ class DTHMM(nn.Module):
 
     # log format normalize
     def log_normalize(self, t):
-        return self.logsoftmax0(t)
+        return self.logsoftmax1(t)
 
     def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         batch, maxlen = sentences.size()
@@ -389,7 +386,7 @@ class DEHMM(nn.Module):
 
     # log format normalize
     def log_normalize(self, t):
-        return self.logsoftmax0(t)
+        return self.logsoftmax1(t)
 
     def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         batch, maxlen = sentences.size()
@@ -405,10 +402,8 @@ class DEHMM(nn.Module):
         forward_transition = self.logsoftmax1(self.transition.unsqueeze(0))
 
         # s_0
-        forward = self.logsoftmax0(self.begin).expand([batch, self.num_state])
+        current_mid = self.logsoftmax0(self.begin).expand([batch, self.num_state])
 
-        # forward
-        current_mid = self.bmv_log_product(forward_transition, forward)
         mid_forwards = [current_mid]
         for i in range(0, maxlen-1):
             # c_i-1
@@ -460,7 +455,7 @@ class SNLHMM(nn.Module):
 
     # log format normalize
     def log_normalize(self, t):
-        return self.logsoftmax0(t)
+        return self.logsoftmax1(t)
 
     @staticmethod
     def normalize(t, dim=-1):
@@ -480,10 +475,7 @@ class SNLHMM(nn.Module):
         forward_transition = self.transition.unsqueeze(0)
 
         # s_0
-        forward = self.logsoftmax0(self.begin).expand([batch, self.num_state])
-
-        # forward
-        current_mid = torch.sigmoid(torch.matmul(forward_transition, torch.exp(forward).unsqueeze(-1))).squeeze(-1)
+        current_mid = torch.sigmoid(self.logsoftmax0(self.begin).expand([batch, self.num_state]))
         mid_forwards = [current_mid]
         for i in range(0, maxlen-1):
             # c_i-1
