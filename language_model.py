@@ -69,8 +69,8 @@ def main():
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
-    parser.add_argument('--model', choices=['HMM', 'HMM1'], default='HMM')
-    parser.add_argument('--symbolic', type=bool, default=True)
+    parser.add_argument('--model', choices=['HMM', 'HMM1', 'TBHMM', 'ABHMM', 'GBHMM', 'DTHMM', 'DEHMM', 'SNLHMM'], default='SNLHMM')
+    parser.add_argument('--symbolic', type=bool, default=False)
 
     args = parser.parse_args()
 
@@ -108,7 +108,7 @@ def main():
     # logger = LOGGER
     logger.info(args)
 
-    device = torch.device('cuda')  # if args.gpu else torch.device('cpu')
+    device = torch.device('cuda') # if args.gpu else torch.device('cpu')
 
     # Loading data
     logger.info('Load PTB data....')
@@ -137,6 +137,18 @@ def main():
         model = HMMLanguageModel(vocab_size=ntokens, num_state=dim)
     elif model_type == 'HMM1':
         model = HMM(vocab_size=ntokens, num_state=dim)
+    elif model_type == 'TBHMM':
+        model = TBHMM(vocab_size=ntokens, num_state=dim)
+    elif model_type == 'ABHMM':
+        model = ABHMM(vocab_size=ntokens, num_state=dim)
+    elif model_type == 'GBHMM':
+        model = GBHMM(vocab_size=ntokens, num_state=dim)
+    elif model_type == 'DTHMM':
+        model = DTHMM(vocab_size=ntokens, num_state=dim)
+    elif model_type == 'DEHMM':
+        model = DEHMM(vocab_size=ntokens, num_state=dim)
+    elif model_type == 'SNLHMM':
+        model = SNLHMM(vocab_size=ntokens, num_state=dim)
     else:
         raise ValueError('Error model type')
 
