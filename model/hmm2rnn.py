@@ -246,7 +246,7 @@ class GBHMM(nn.Module):
 
     # log format normalize
     def log_normalize(self, t):
-        return self.logsoftmax0(t)
+        return self.logsoftmax1(t)
 
     def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         batch, maxlen = sentences.size()
@@ -486,7 +486,7 @@ class SNLHMM(nn.Module):
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
         hidden_states = torch.stack(mid_forwards)
-        ppl = torch.matmul(self.normalize(hidden_states).unsqueeze(-2), emission.unsqueeze(-1)).reshape_as(masks) * masks
+        ppl = torch.logsumexp(torch.log(self.normalize(hidden_states)) + emission, dim=-1) * masks.transpose(0, 1)
         return torch.sum(ppl)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
