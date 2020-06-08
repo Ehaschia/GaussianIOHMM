@@ -254,7 +254,7 @@ class GBHMM(nn.Module):
         # shape [length, batch]
         swapped_sentence = sentences.transpose(0, 1)
         # prob emission
-        prob_emission = self.logsoftmax1(self.input)
+        prob_emission = self.logsoftmax0(self.input)
         # emission (E)
         emission = F.embedding(swapped_sentence.reshape(-1), self.input).reshape(maxlen, batch, self.num_state)
         # equation 25
