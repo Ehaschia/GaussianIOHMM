@@ -59,7 +59,8 @@ class HMM(nn.Module):
             # s_i
             current_forward = self.log_normalize(pre_forward + emission[i])
             # c_i
-            current_mid = self.bmv_log_product(forward_transition, current_forward)
+            # current_mid = self.bmv_log_product(forward_transition, current_forward)
+            current_mid = torch.logsumexp(forward_transition + current_forward.unsqueeze(-1), dim=-1)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
         hidden_states = torch.stack(mid_forwards)
@@ -127,7 +128,9 @@ class TBHMM(nn.Module):
             current_forward = self.log_normalize(pre_forward + log_e[i])
             # c_i
             current_mid = self.logsoftmax1(torch.matmul(forward_transition, torch.exp(log_e[i].view(batch, 1, self.num_state, 1))).squeeze(-1))
-            current_mid = torch.logsumexp(current_mid + current_forward.unsqueeze(-1), dim=-2)
+            # TODO find the difference?
+            # current_mid = torch.logsumexp(current_mid + current_forward.unsqueeze(-1), dim=-2)
+            current_mid = torch.logsumexp(current_mid + current_forward.unsqueeze(-1), dim=-1)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
         hidden_states = torch.stack(mid_forwards)
@@ -200,7 +203,8 @@ class ABHMM(nn.Module):
             current_forward = self.log_normalize(pre_forward + log_e[i])
             # c_i
             current_mid = self.logsoftmax1(self.emission_transition(torch.exp(log_e[i])).unsqueeze(-2) + forward_transition)
-            current_mid = self.bmv_log_product(current_mid, current_forward)
+            # current_mid = self.bmv_log_product(current_mid, current_forward)
+            current_mid = torch.logsumexp(current_mid + current_forward.unsqueeze(-1), dim=-1)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
         hidden_states = torch.stack(mid_forwards)
@@ -275,7 +279,8 @@ class GBHMM(nn.Module):
             current_forward = self.log_normalize(pre_forward + prob_e[i])
             # c_i
             current_mid = self.logsoftmax1(forward_transition * fe[i].unsqueeze(1))
-            current_mid = self.bmv_log_product(current_mid, current_forward)
+            # current_mid = self.bmv_log_product(current_mid, current_forward)
+            current_mid = torch.logsumexp(current_mid + current_forward.unsqueeze(-1), dim=-1)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
         hidden_states = torch.stack(mid_forwards)
@@ -410,7 +415,8 @@ class DEHMM(nn.Module):
             # s_i
             current_forward = self.log_normalize(pre_forward + log_e[i])
             # c_i
-            current_mid = self.bmv_log_product(forward_transition, current_forward)
+            # current_mid = self.bmv_log_product(forward_transition, current_forward)
+            current_mid = torch.logsumexp(forward_transition + current_forward.unsqueeze(-1), dim=-1)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
         hidden_states = torch.stack(mid_forwards)
