@@ -55,10 +55,9 @@ class HMM(nn.Module):
         mid_forwards = [current_mid]
         for i in range(0, maxlen-1):
             # c_i-1
-            pre_forward = mid_forwards[i - 1]
+            pre_forward = mid_forwards[i]
             # s_i
             current_forward = self.log_normalize(pre_forward + emission[i])
-            # current_forward = self.bmv_log_product(forward_transition, pre_forward)
             # c_i
             current_mid = self.bmv_log_product(forward_transition, current_forward)
             mid_forwards.append(current_mid)
@@ -196,7 +195,7 @@ class ABHMM(nn.Module):
         mid_forwards = [current_mid]
         for i in range(0, maxlen-1):
             # c_i-1
-            pre_forward = mid_forwards[i - 1]
+            pre_forward = mid_forwards[i]
             # s_i
             current_forward = self.log_normalize(pre_forward + log_e[i])
             # c_i
@@ -271,7 +270,7 @@ class GBHMM(nn.Module):
         mid_forwards = [current_mid]
         for i in range(0, maxlen-1):
             # c_i-1
-            pre_forward = mid_forwards[i - 1]
+            pre_forward = mid_forwards[i]
             # s_i
             current_forward = self.log_normalize(pre_forward + prob_e[i])
             # c_i
@@ -280,7 +279,7 @@ class GBHMM(nn.Module):
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
         hidden_states = torch.stack(mid_forwards)
-        pred_prob = hidden_states + emission
+        pred_prob = hidden_states + prob_e
         ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
         return torch.sum(ppl)
 
@@ -339,7 +338,7 @@ class DTHMM(nn.Module):
         mid_forwards = [current_mid]
         for i in range(0, maxlen - 1):
             # c_i-1
-            pre_forward = mid_forwards[i - 1]
+            pre_forward = mid_forwards[i]
             # s_i
             current_forward = self.log_normalize(pre_forward + log_e[i])
             # c_i
@@ -479,7 +478,7 @@ class SNLHMM(nn.Module):
         mid_forwards = [current_mid]
         for i in range(0, maxlen-1):
             # c_i-1
-            pre_forward = mid_forwards[i - 1]
+            pre_forward = mid_forwards[i]
             # log format s_i
             current_forward = self.log_normalize(torch.log(self.normalize(pre_forward)) + emission[i])
             # c_i
