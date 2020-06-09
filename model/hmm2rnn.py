@@ -26,14 +26,18 @@ class HMM(nn.Module):
         nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
         nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
 
-    # def debug_init(self):
-    #     self.transition.data = torch.tensor([[0.7, 0.3], [0.1, 0.9]])
-    #     self.input.data = torch.tensor([[10.0, -1.0], [-1.0, 10.0]])
-    #     self.begin.data = torch.tensor([-1.0, 10.0])
+    def debug_init(self):
+        self.transition.data = torch.tensor([[0.7, 0.3], [0.1, 0.9]])
+        self.input.data = torch.tensor([[10.0, -1.0], [-1.0, 10.0]])
+        self.begin.data = torch.tensor([-1.0, 10.0])
 
     @staticmethod
     def bmv_log_product(bm, bv):
         return torch.logsumexp(bm + bv.unsqueeze(-2), dim=-1)
+
+    @staticmethod
+    def bvm_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
 
     @staticmethod
     def bmm_log_product(bm1, bm2):
@@ -64,7 +68,7 @@ class HMM(nn.Module):
             # s_i
             current_forward = self.log_normalize(pre_forward + emission[i])
             # c_i
-            current_mid = self.bmv_log_product(forward_transition, current_forward)
+            current_mid = self.bvm_log_product(forward_transition, current_forward)
             # current_mid = torch.logsumexp(forward_transition + current_forward.unsqueeze(-1), dim=-1)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
@@ -105,6 +109,11 @@ class TBHMM(nn.Module):
     def bmm_log_product(bm1, bm2):
         return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
 
+    @staticmethod
+    def bvm_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
+
+
     # log format normalize
     def log_normalize(self, t):
         return self.logsoftmax1(t)
@@ -135,7 +144,7 @@ class TBHMM(nn.Module):
             current_mid = self.logsoftmax1(torch.matmul(forward_transition, torch.exp(log_e[i].view(batch, 1, self.num_state, 1))).squeeze(-1))
             # TODO find the difference?
             # current_mid = torch.logsumexp(current_mid + current_forward.unsqueeze(-1), dim=-2)
-            current_mid = self.bmv_log_product(current_mid, current_forward)
+            current_mid = self.bvm_log_product(current_mid, current_forward)
             # current_mid = torch.logsumexp(current_mid + current_forward.unsqueeze(-1), dim=-1)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
@@ -181,6 +190,11 @@ class ABHMM(nn.Module):
     def bmm_log_product(bm1, bm2):
         return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
 
+    @staticmethod
+    def bvm_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
+
+
     # log format normalize
     def log_normalize(self, t):
         return self.logsoftmax1(t)
@@ -209,7 +223,7 @@ class ABHMM(nn.Module):
             current_forward = self.log_normalize(pre_forward + log_e[i])
             # c_i
             current_mid = self.logsoftmax1(self.emission_transition(torch.exp(log_e[i])).unsqueeze(-2) + forward_transition)
-            current_mid = self.bmv_log_product(current_mid, current_forward)
+            current_mid = self.bvm_log_product(current_mid, current_forward)
             # current_mid = torch.logsumexp(current_mid + current_forward.unsqueeze(-1), dim=-1)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
@@ -253,6 +267,10 @@ class GBHMM(nn.Module):
     @staticmethod
     def bmm_log_product(bm1, bm2):
         return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
+
+    @staticmethod
+    def bvm_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
 
     # log format normalize
     def log_normalize(self, t):
@@ -326,6 +344,11 @@ class DTHMM(nn.Module):
     def bmm_log_product(bm1, bm2):
         return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
 
+    @staticmethod
+    def bvm_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
+
+
     # log format normalize
     def log_normalize(self, t):
         return self.logsoftmax1(t)
@@ -394,6 +417,10 @@ class DEHMM(nn.Module):
     def bmm_log_product(bm1, bm2):
         return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
 
+    @staticmethod
+    def bvm_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
+
     # log format normalize
     def log_normalize(self, t):
         return self.logsoftmax1(t)
@@ -421,7 +448,7 @@ class DEHMM(nn.Module):
             # s_i
             current_forward = self.log_normalize(pre_forward + log_e[i])
             # c_i
-            current_mid = self.bmv_log_product(forward_transition, current_forward)
+            current_mid = self.bvm_log_product(forward_transition, current_forward)
             # current_mid = torch.logsumexp(forward_transition + current_forward.unsqueeze(-1), dim=-1)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
@@ -463,6 +490,10 @@ class SNLHMM(nn.Module):
     @staticmethod
     def bmm_log_product(bm1, bm2):
         return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
+
+    @staticmethod
+    def bvm_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
 
     # log format normalize
     def log_normalize(self, t):

@@ -327,10 +327,15 @@ class HMMLanguageModel(LanguageModel):
     def bmm_log_product(bm1, bm2):
         return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
 
-    # def debug_init(self):
-    #     self.transition.data = torch.tensor([[0.7, 0.3], [0.3, 0.7]])
-    #     self.input.data = torch.tensor([[10.0, -1.0], [-1.0, 10.0]])
-    #     self.begin.data = torch.tensor([-1.0, 10.0])
+    @staticmethod
+    def bvm_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
+
+
+    def debug_init(self):
+        self.transition.data = torch.tensor([[0.7, 0.3], [0.1, 0.9]])
+        self.input.data = torch.tensor([[10.0, -1.0], [-1.0, 10.0]])
+        self.begin.data = torch.tensor([-1.0, 10.0])
 
     def smooth_parameters(self):
         self.input.data = smoothing(self.input.data)
@@ -351,7 +356,7 @@ class HMMLanguageModel(LanguageModel):
         for i in range(0, maxlen-1):
             pre_mid = forward_mid[i]
             current_forward = pre_mid + forward_emission[i]
-            current_mid = self.bmv_log_product(forward_transition, current_forward)
+            current_mid = self.bvm_log_product(forward_transition, current_forward)
             forward_mid.append(current_mid)
         # shape [batch, max_len, dim]
         hidden_states = torch.stack(forward_mid)
