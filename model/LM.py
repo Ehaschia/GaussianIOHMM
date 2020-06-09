@@ -311,14 +311,13 @@ class HMMLanguageModel(LanguageModel):
         self.criterion = nn.CrossEntropyLoss(reduction='none')
         self.logsoftmax1 = nn.LogSoftmax(dim=-1)
         self.logsoftmax0 = nn.LogSoftmax(dim=0)
-
-        # TODO try this
-        # self.adaptivelogsm = nn.AdaptiveLogSoftmaxWithLoss()
+        self.begin = Parameter(torch.empty(self.num_state))
         self.reset_parameter()
 
     def reset_parameter(self):
         nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
         nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
 
     @staticmethod
     def bmv_log_product(bm, bv):
@@ -327,6 +326,11 @@ class HMMLanguageModel(LanguageModel):
     @staticmethod
     def bmm_log_product(bm1, bm2):
         return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
+
+    # def debug_init(self):
+    #     self.transition.data = torch.tensor([[0.7, 0.3], [0.3, 0.7]])
+    #     self.input.data = torch.tensor([[10.0, -1.0], [-1.0, 10.0]])
+    #     self.begin.data = torch.tensor([-1.0, 10.0])
 
     def smooth_parameters(self):
         self.input.data = smoothing(self.input.data)
@@ -340,19 +344,19 @@ class HMMLanguageModel(LanguageModel):
         norm_input = self.logsoftmax0(self.input)
         forward_emission = F.embedding(swapped_sentence.reshape(-1), norm_input).reshape(maxlen, batch, self.num_state)
         forward_transition = self.logsoftmax1(self.transition.unsqueeze(0))
+        prob_begin = self.logsoftmax1(self.begin).expand(batch, self.num_state)
         # forward
-        forwards = [forward_emission[0]]
+        forward_mid = [prob_begin]
         # forwards = [self.tanh(forward_emission[0])]
-        for i in range(1, maxlen):
-            pre_forward = forwards[i - 1]
-            current_forward = self.bmv_log_product(forward_transition, pre_forward)
-            forwards.append(current_forward + forward_emission[i])
-            # current_forward = torch.matmul(forward_transition, pre_forward.unsqueeze(-1)).squeeze(-1)
-            # forwards.append(current_forward * forward_emission[i])
+        for i in range(0, maxlen-1):
+            pre_mid = forward_mid[i]
+            current_forward = pre_mid + forward_emission[i]
+            current_mid = self.bmv_log_product(forward_transition, current_forward)
+            forward_mid.append(current_mid)
         # shape [batch, max_len, dim]
-        hidden_states = torch.stack(forwards)
+        hidden_states = torch.stack(forward_mid)
         length = torch.sum(masks, dim=-1).long()
-        forward_scores = hidden_states[length-1, torch.arange(batch)]
+        forward_scores = hidden_states[length-1, torch.arange(batch)] + forward_emission[maxlen-1]
         ppl = torch.logsumexp(forward_scores, dim=-1)
         # shape [batch, label]
         # ppl = torch.sum(torch.logsumexp(hidden_states, dim=-1).transpose(0, 1) * masks)

@@ -48,14 +48,14 @@ def save_parameter_to_json(path, parameters):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Gaussian Input Output HMM")
+    parser = argparse.ArgumentParser(description="HMM Language Model")
 
     parser.add_argument(
         '--data',
         type=str,
         default='./dataset/ptb/',
         help='location of the data corpus')
-    parser.add_argument('--batch', type=int, default=50)
+    parser.add_argument('--batch', type=int, default=16)
     parser.add_argument('--optim', choices=['sgd', 'adam'], default='adam')
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--lr_decay', type=float, default=0.999995, help='Decay rate of learning rate')
