@@ -335,10 +335,10 @@ class DBHMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.d1.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.d2.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.d1.data, a=-0.1, b=0.1)
+        nn.init.uniform_(self.d2.data, a=-0.1, b=0.1)
+        nn.init.uniform_(self.input.data, a=-0.1, b=0.1)
+        nn.init.uniform_(self.begin.data, a=-0.1, b=0.1)
 
     @staticmethod
     def bmv_log_product(bm, bv):
