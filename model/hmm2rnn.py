@@ -316,6 +316,80 @@ class GBHMM(nn.Module):
         ppl = self.forward(sentences, masks)
         return -1.0 * ppl / masks.size(0)
 
+
+# Decomposed based
+class DBHMM(nn.Module):
+    def __init__(self, vocab_size, num_state1=10, num_state2=10):
+        super(DBHMM, self).__init__()
+        self.vocab_size = vocab_size
+        self.num_state1 = num_state1
+        self.num_state2 = num_state2
+        self.input = Parameter(torch.empty(self.vocab_size, self.num_state1), requires_grad=True)
+        self.d1 = Parameter(torch.empty(self.num_state2, self.num_state1), requires_grad=True)
+        self.d2 = Parameter(torch.empty(self.num_state2, self.num_state1), requires_grad=True)
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
+        self.begin = Parameter(torch.empty(self.num_state2), requires_grad=True)
+        self.logsoftmax1 = nn.LogSoftmax(dim=-1)
+        self.logsoftmax0 = nn.LogSoftmax(dim=0)
+
+        self.reset_parameter()
+
+    def reset_parameter(self):
+        nn.init.uniform_(self.d1.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.d2.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+
+    @staticmethod
+    def bmv_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-2), dim=-1)
+
+    @staticmethod
+    def bmm_log_product(bm1, bm2):
+        return torch.logsumexp(bm1.unsqueeze(-1) + bm2.unsqueeze(-3), dim=-2)
+
+    @staticmethod
+    def bvm_log_product(bm, bv):
+        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
+
+    # log format normalize
+    def log_normalize(self, t):
+        return self.logsoftmax1(t)
+
+    def forward(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        batch, maxlen = sentences.size()
+
+        # shape [length, batch]
+        swapped_sentence = sentences.transpose(0, 1)
+        # prob emission (E)
+        norm_input = self.logsoftmax0(self.input)
+
+        log_e = F.embedding(swapped_sentence.reshape(-1), norm_input).reshape(maxlen, batch, self.num_state1)
+
+        # c_0, shape [batch, state]
+        current_mid = self.logsoftmax0(self.begin).expand([batch, self.num_state2])
+
+        # forward
+        mid_forwards = [current_mid]
+        for i in range(0, maxlen-1):
+            # c_i-1
+            pre_mid = mid_forwards[i - 1]
+            # c_i
+            a = torch.matmul(pre_mid.unsqueeze(1), self.d1.unsqueeze(0)).squeeze(1)
+            current_mid = self.logsoftmax1(torch.matmul(a.unsqueeze(1), self.d2.unsqueeze(0).transpose(1, 2)).squeeze(1))
+
+            mid_forwards.append(current_mid)
+        # shape [max_len, batch, dim]
+        hidden_states = torch.stack(mid_forwards)
+        pred_prob = hidden_states + log_e
+        ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
+        return torch.sum(ppl)
+
+    def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        ppl = self.forward(sentences, masks)
+        return -1.0 * ppl / masks.size(0)
+
+
 # delay transition
 class DTHMM(nn.Module):
     def __init__(self, vocab_size, num_state=10):

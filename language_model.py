@@ -69,7 +69,8 @@ def main():
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--random_seed', type=int, default=10)
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
-    parser.add_argument('--model', choices=['HMM', 'HMM1', 'TBHMM', 'ABHMM', 'GBHMM', 'DTHMM', 'DEHMM', 'SNLHMM'], default='TBHMM')
+    parser.add_argument('--model', choices=['HMM', 'HMM1', 'TBHMM', 'ABHMM', 'GBHMM', 'DBHMM',
+                                            'DTHMM', 'DEHMM', 'SNLHMM'], default='DBHMM')
     parser.add_argument('--symbolic_start', type=bool, default=False)
     parser.add_argument('--symbolic_end', type=bool, default=False)
 
@@ -143,6 +144,8 @@ def main():
         model = TBHMM(vocab_size=ntokens, num_state=dim)
     elif model_type == 'ABHMM':
         model = ABHMM(vocab_size=ntokens, num_state=dim)
+    elif model_type == 'DBHMM':
+        model = DBHMM(vocab_size=ntokens, num_state1=dim, num_state2=dim)
     elif model_type == 'GBHMM':
         model = GBHMM(vocab_size=ntokens, num_state=dim)
     elif model_type == 'DTHMM':
