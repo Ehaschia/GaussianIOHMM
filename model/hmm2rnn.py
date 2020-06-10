@@ -303,7 +303,7 @@ class GBHMM(nn.Module):
             current_forward = self.log_normalize(pre_forward + prob_e[i])
             # c_i
             current_mid = self.logsoftmax1(forward_transition * fe[i].unsqueeze(1))
-            current_mid = self.bmv_log_product(current_mid, current_forward)
+            current_mid = self.bvm_log_product(current_mid, current_forward)
             # current_mid = torch.logsumexp(current_mid + current_forward.unsqueeze(-1), dim=-1)
             mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
