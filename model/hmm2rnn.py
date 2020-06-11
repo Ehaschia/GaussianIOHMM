@@ -375,7 +375,7 @@ class DBHMM(nn.Module):
             # c_i-1
             pre_mid = mid_forwards[i - 1]
             # c_i
-            a = torch.matmul(torch.exp(pre_mid).unsqueeze(1), self.d1.unsqueeze(0)).squeeze(1) + log_e[i]
+            a = torch.matmul(torch.exp(pre_mid).unsqueeze(1), self.d1.unsqueeze(0)).squeeze(1) * torch.exp(log_e[i])
             current_mid = self.logsoftmax1(torch.matmul(a.unsqueeze(1), self.d2.unsqueeze(0).transpose(1, 2)).squeeze(1))
 
             mid_forwards.append(current_mid)
