@@ -327,6 +327,7 @@ class DBHMM(nn.Module):
         self.input = Parameter(torch.empty(self.vocab_size, self.num_state1), requires_grad=True)
         self.d1 = Parameter(torch.empty(self.num_state2, self.num_state1), requires_grad=True)
         self.d2 = Parameter(torch.empty(self.num_state2, self.num_state1), requires_grad=True)
+        self.Er = Parameter(torch.empty(self.vocab_size, self.num_state1), requires_grad=True)
         self.criterion = nn.CrossEntropyLoss(reduction='none')
         self.begin = Parameter(torch.empty(self.num_state2), requires_grad=True)
         self.logsoftmax1 = nn.LogSoftmax(dim=-1)
@@ -365,7 +366,7 @@ class DBHMM(nn.Module):
         norm_input = self.logsoftmax0(self.input)
 
         log_e = F.embedding(swapped_sentence.reshape(-1), norm_input).reshape(maxlen, batch, self.num_state1)
-
+        er_embedding = F.embedding(swapped_sentence.reshape(-1), self.Er).reshape(maxlen, batch, self.num_state1)
         # c_0, shape [batch, state]
         current_mid = self.logsoftmax0(self.begin).expand([batch, self.num_state2])
 
@@ -375,7 +376,7 @@ class DBHMM(nn.Module):
             # c_i-1
             pre_mid = mid_forwards[i - 1]
             # c_i
-            a = torch.matmul(torch.exp(pre_mid).unsqueeze(1), self.d1.unsqueeze(0)).squeeze(1) * torch.exp(log_e[i])
+            a = torch.matmul(torch.exp(pre_mid).unsqueeze(1), self.d1.unsqueeze(0)).squeeze(1) * er_embedding[i]
             current_mid = self.logsoftmax1(torch.matmul(a.unsqueeze(1), self.d2.unsqueeze(0).transpose(1, 2)).squeeze(1))
 
             mid_forwards.append(current_mid)
