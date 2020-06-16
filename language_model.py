@@ -124,7 +124,8 @@ def main():
                                                                                              data_paths=[dev_path, test_path],
                                                                                              embedd_dict=None,
                                                                                              max_vocabulary_size=10000,
-                                                                                             min_occurrence=1)
+                                                                                             min_occurrence=1,
+                                                                                             unk_rank=0)
 
     train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
                                                    symbolic_root=s_start, symbolic_end=s_end)
