@@ -123,7 +123,7 @@ def main():
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = conllx_data.create_alphabets(alphabet_path, train_path,
                                                                                              data_paths=[dev_path, test_path],
                                                                                              embedd_dict=None,
-                                                                                             max_vocabulary_size=1e5,
+                                                                                             max_vocabulary_size=10000,
                                                                                              min_occurrence=1)
 
     train_dataset = conllx_data.read_bucketed_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
