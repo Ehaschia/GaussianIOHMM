@@ -125,7 +125,7 @@ def main():
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = conllx_data.create_alphabets(alphabet_path, train_path,
                                                                                              data_paths=[dev_path, test_path],
                                                                                              embedd_dict=None,
-                                                                                             max_vocabulary_size=1e4,
+                                                                                             max_vocabulary_size=10000,
                                                                                              min_occurrence=1,
                                                                                              unk_rank=0)
 
