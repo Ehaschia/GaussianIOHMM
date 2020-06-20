@@ -35,7 +35,7 @@ def get_optimizer(parameters, optim, learning_rate, amsgrad, weight_decay, lr_de
     if optim == 'sgd':
         optimizer = SGD(parameters, lr=learning_rate, momentum=0.9, weight_decay=weight_decay, nesterov=True)
     else:
-        optimizer = AdamW(parameters, lr=learning_rate, betas=(0.9, 0.999), eps=1e-8, amsgrad=amsgrad,
+        optimizer = AdamW(parameters, lr=learning_rate, betas=(0.0, 0.999), eps=1e-8, amsgrad=amsgrad,
                           weight_decay=weight_decay)
     init_lr = 1e-7
     scheduler = ExponentialScheduler(optimizer, lr_decay, warmup_steps, init_lr)
