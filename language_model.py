@@ -184,7 +184,7 @@ def main():
                 # samples = train_dataset[j * batch_size: (j + 1) * batch_size]
                 words, masks = data['WORD'].to(device), data['MASK'].to(device)
 
-                loss = model.get_loss(words, masks)
+                loss = model(words, masks)
                 loss.backward()
                 optimizer.step()
                 scheduler.step()

@@ -77,7 +77,7 @@ class HMM(nn.Module):
         pred_prob = hidden_states + emission
         ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
         # ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl)
+        return -1.0 * torch.sum(ppl) / masks.size(0)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
@@ -152,7 +152,7 @@ class TBHMM(nn.Module):
         hidden_states = torch.stack(mid_forwards)
         pred_prob = hidden_states + log_e
         ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl)
+        return -1.0 * torch.sum(ppl) / masks.size(0)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
@@ -230,7 +230,7 @@ class ABHMM(nn.Module):
         hidden_states = torch.stack(mid_forwards)
         pred_prob = hidden_states + log_e
         ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl)
+        return -1.0 * torch.sum(ppl) / masks.size(0)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
@@ -310,7 +310,7 @@ class GBHMM(nn.Module):
         hidden_states = torch.stack(mid_forwards)
         pred_prob = hidden_states + prob_e
         ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl)
+        return -1.0 * torch.sum(ppl) / masks.size(0)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
@@ -385,7 +385,7 @@ class DBHMM(nn.Module):
         hidden_states = torch.stack(mid_forwards)
         pred_prob = hidden_states + log_e
         ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl)
+        return -1.0 * torch.sum(ppl) / masks.size(0)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
@@ -463,7 +463,7 @@ class EDBHMM(nn.Module):
         hidden_states = torch.stack(mid_forwards)
         pred_prob = hidden_states + log_e
         ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl)
+        return -1.0 * torch.sum(ppl) / masks.size(0)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
@@ -535,7 +535,7 @@ class DTHMM(nn.Module):
         hidden_states = torch.stack(mid_forwards)
         pred_prob = hidden_states + log_e
         ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl)
+        return -1.0 * torch.sum(ppl) / masks.size(0)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
@@ -609,7 +609,7 @@ class DEHMM(nn.Module):
         # TODO OOM
         pred_prob = self.logsoftmax1(torch.matmul(self.input.unsqueeze(0), torch.exp(hidden_states.view(-1, self.num_state, 1))))
         ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl)
+        return -1.0 * torch.sum(ppl) / masks.size(0)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
@@ -683,7 +683,7 @@ class SNLHMM(nn.Module):
         # shape [max_len, batch, dim]
         hidden_states = torch.stack(mid_forwards)
         ppl = torch.logsumexp(torch.log(self.normalize(hidden_states)) + emission, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl)
+        return -1.0 * torch.sum(ppl) / masks.size(0)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
