@@ -125,7 +125,7 @@ def main():
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = conllx_data.create_alphabets(alphabet_path, train_path,
                                                                                              data_paths=[dev_path, test_path],
                                                                                              embedd_dict=None,
-                                                                                             max_vocabulary_size=10000,
+                                                                                             max_vocabulary_size=100000,
                                                                                              min_occurrence=1,
                                                                                              unk_rank=0)
 
@@ -231,7 +231,7 @@ def main():
                     "Test ACC: " + str(round(best_epoch[2], 3)))
         return best_epoch
 
-    best_epoch = train(best_epoch, thread=500)
+    best_epoch = train(best_epoch, thread=35)
 
     with open(log_dir + '/' + 'result.json', 'w') as f:
         final_result = {"Epoch": best_epoch[0],
