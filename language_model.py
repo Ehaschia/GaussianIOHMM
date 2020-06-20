@@ -26,7 +26,9 @@ def evaluate(data, batch, model, device):
             words = batch_data['WORD'].to(device)
             masks = batch_data['MASK'].to(device)
             lengths = batch_data['LENGTH']
-            ppl = model.get_loss(words, masks)
+            ppl = model(words, masks)
+            if torch.cuda.device_count() > 1:
+                ppl = ppl.mean()
             total_ppl += ppl.item() * words.size(0)
             word_cnt += torch.sum(lengths).item()
     return total_ppl / word_cnt
