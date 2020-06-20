@@ -158,7 +158,7 @@ def main():
 
     def train(best_epoch, thread=6):
         epoch = 0
-        while epoch - best_epoch[0] <= thread:
+        while epoch <= thread:
             epoch_loss = 0
             num_back = 0
             num_words = 0
@@ -213,7 +213,7 @@ def main():
                     "Test ACC: " + str(round(best_epoch[2], 3)))
         return best_epoch
 
-    best_epoch = train(best_epoch, thread=10)
+    best_epoch = train(best_epoch, thread=20)
 
     with open(log_dir + '/' + 'result.json', 'w') as f:
         final_result = {"Epoch": best_epoch[0],
