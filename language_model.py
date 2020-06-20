@@ -185,6 +185,8 @@ def main():
                 words, masks = data['WORD'].to(device), data['MASK'].to(device)
 
                 loss = model(words, masks)
+                if torch.cuda.device_count() > 1:
+                    loss = loss.mean()
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
