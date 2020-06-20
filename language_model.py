@@ -71,7 +71,7 @@ def main():
     parser.add_argument('--random_seed', type=int, default=10)
     parser.add_argument('--unk_replace', type=float, default=0.0, help='The rate to replace a singleton word with UNK')
     parser.add_argument('--model', choices=['HMM', 'HMM1', 'TBHMM', 'ABHMM', 'GBHMM', 'DBHMM',
-                                            'DTHMM', 'DEHMM', 'SNLHMM'], default='DBHMM')
+                                            'DTHMM', 'DEHMM', 'SNLHMM'], default='HMM1')
     parser.add_argument('--symbolic_start', type=bool, default=False)
     parser.add_argument('--symbolic_end', type=bool, default=False)
 
@@ -158,7 +158,9 @@ def main():
         model = SNLHMM(vocab_size=ntokens, num_state=dim)
     else:
         raise ValueError('Error model type')
-
+    if torch.cuda.device_count() > 1:
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        model = nn.DataParallel(model)
     model.to(device)
     logger.info('Building model ' + model.__class__.__name__ + '...')
     parameters_need_update = filter(lambda p: p.requires_grad, model.parameters())

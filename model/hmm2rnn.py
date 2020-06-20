@@ -37,8 +37,7 @@ class HMM(nn.Module):
 
     @staticmethod
     def bvm_log_product(bm, bv):
-        tmp = bm + bv.unsqueeze(-1)
-        return torch.logsumexp(tmp, dim=-2)
+        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
 
     @staticmethod
     def bmm_log_product(bm1, bm2):
@@ -62,24 +61,23 @@ class HMM(nn.Module):
 
         # s_0
         current_mid = self.logsoftmax0(self.begin).expand([batch, self.num_state])
-        # mid_forwards = [current_mid]
+        mid_forwards = [current_mid]
         ppl = [torch.logsumexp(current_mid + emission[0], dim=-1)]
         for i in range(0, maxlen-1):
             # c_i-1
-            pre_forward = current_mid
+            pre_forward = mid_forwards[i]
             # s_i
             current_forward = self.log_normalize(pre_forward + emission[i])
             # c_i
             current_mid = self.bvm_log_product(forward_transition, current_forward)
             # current_mid = torch.logsumexp(forward_transition + current_forward.unsqueeze(-1), dim=-1)
-            # mid_forwards.append(current_mid)
-            ppl.append(torch.logsumexp(current_mid + emission[i+1], dim=-1))
+            mid_forwards.append(current_mid)
         # shape [max_len, batch, dim]
-        # hidden_states = torch.stack(mid_forwards)
-        # pred_prob = hidden_states + emission
-        ppl_tensor = torch.stack(ppl) * masks.transpose(0, 1)
+        hidden_states = torch.stack(mid_forwards)
+        pred_prob = hidden_states + emission
+        ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
         # ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl_tensor)
+        return torch.sum(ppl)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
