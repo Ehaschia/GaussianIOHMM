@@ -37,7 +37,8 @@ class HMM(nn.Module):
 
     @staticmethod
     def bvm_log_product(bm, bv):
-        return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
+        tmp = bm + bv.unsqueeze(-1)
+        return torch.logsumexp(tmp, dim=-2)
 
     @staticmethod
     def bmm_log_product(bm1, bm2):
