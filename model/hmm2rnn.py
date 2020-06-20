@@ -22,9 +22,9 @@ class HMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.transition.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.input.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.begin.data, a=-0.8, b=0.8)
 
     def debug_init(self):
         self.transition.data = torch.tensor([[0.7, 0.3], [0.1, 0.9]])
@@ -61,21 +61,24 @@ class HMM(nn.Module):
 
         # s_0
         current_mid = self.logsoftmax0(self.begin).expand([batch, self.num_state])
-        mid_forwards = [current_mid]
+        # mid_forwards = [current_mid]
+        ppl = [torch.logsumexp(current_mid + emission[0], dim=-1)]
         for i in range(0, maxlen-1):
             # c_i-1
-            pre_forward = mid_forwards[i]
+            pre_forward = current_mid
             # s_i
             current_forward = self.log_normalize(pre_forward + emission[i])
             # c_i
             current_mid = self.bvm_log_product(forward_transition, current_forward)
             # current_mid = torch.logsumexp(forward_transition + current_forward.unsqueeze(-1), dim=-1)
-            mid_forwards.append(current_mid)
+            # mid_forwards.append(current_mid)
+            ppl.append(torch.logsumexp(current_mid + emission[i+1], dim=-1))
         # shape [max_len, batch, dim]
-        hidden_states = torch.stack(mid_forwards)
-        pred_prob = hidden_states + emission
-        ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
-        return torch.sum(ppl)
+        # hidden_states = torch.stack(mid_forwards)
+        # pred_prob = hidden_states + emission
+        ppl_tensor = torch.stack(ppl) * masks.transpose(0, 1)
+        # ppl = torch.logsumexp(pred_prob, dim=-1) * masks.transpose(0, 1)
+        return torch.sum(ppl_tensor)
 
     def get_loss(self, sentences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         ppl = self.forward(sentences, masks)
@@ -97,9 +100,9 @@ class TBHMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.transition.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.input.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.begin.data, a=-0.8, b=0.8)
 
     @staticmethod
     def bmv_log_product(bm, bv):
@@ -174,11 +177,11 @@ class ABHMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.transition.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.input.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.begin.data, a=-0.8, b=0.8)
         nn.init.zeros_(self.emission_transition.bias.data)
-        nn.init.uniform_(self.emission_transition.weight.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.emission_transition.weight.data, a=-0.8, b=0.8)
 
 
     @staticmethod
@@ -252,11 +255,11 @@ class GBHMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.transition.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.input.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.begin.data, a=-0.8, b=0.8)
         nn.init.zeros_(self.emission_gate.bias.data)
-        nn.init.uniform_(self.emission_gate.weight.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.emission_gate.weight.data, a=-0.8, b=0.8)
 
     @staticmethod
     def bmv_log_product(bm, bv):
@@ -334,11 +337,11 @@ class DBHMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.d1.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.d2.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.Er.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.d1.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.d2.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.Er.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.input.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.begin.data, a=-0.8, b=0.8)
 
     @staticmethod
     def bmv_log_product(bm, bv):
@@ -391,6 +394,7 @@ class DBHMM(nn.Module):
 
 
 # Emission Decomposed based
+# TODO fix the decompose here.
 class EDBHMM(nn.Module):
     def __init__(self, vocab_size, num_state1=10, num_state2=10):
         super(EDBHMM, self).__init__()
@@ -398,7 +402,6 @@ class EDBHMM(nn.Module):
         self.r = num_state1
         self.k = num_state2
         self.transition = Parameter(torch.empty(self.k, self.k), requires_grad=True)
-
         self.d1 = Parameter(torch.empty(self.k, self.r), requires_grad=True)
         self.d2 = Parameter(torch.empty(self.k, self.r), requires_grad=True)
         self.er = nn.Linear(self.vocab_size, self.r)
@@ -410,13 +413,13 @@ class EDBHMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.d1.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.d2.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.er.weight.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.er.bias.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.d1.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.d2.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.er.weight.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.er.bias.data, a=-0.8, b=0.8)
         self.er.bias.requires_grad = False
-        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.transition.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.begin.data, a=-0.8, b=0.8)
 
     @staticmethod
     def bmv_log_product(bm, bv):
@@ -441,7 +444,7 @@ class EDBHMM(nn.Module):
         swapped_sentence = sentences.transpose(0, 1)
         # prob emission (E)
         norm_input = self.logsoftmax0(self.input)
-
+        norm_trans = self.logsoftmax1(self.transition)
         log_e = F.embedding(swapped_sentence.reshape(-1), norm_input).reshape(maxlen, batch, self.r)
         er_embedding = F.embedding(swapped_sentence.reshape(-1), self.Er).reshape(maxlen, batch, self.r)
         # c_0, shape [batch, state]
@@ -484,9 +487,9 @@ class DTHMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.transition.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.input.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.begin.data, a=-0.8, b=0.8)
 
     @staticmethod
     def bmv_log_product(bm, bv):
@@ -499,7 +502,6 @@ class DTHMM(nn.Module):
     @staticmethod
     def bvm_log_product(bm, bv):
         return torch.logsumexp(bm + bv.unsqueeze(-1), dim=-2)
-
 
     # log format normalize
     def log_normalize(self, t):
@@ -557,9 +559,9 @@ class DEHMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.transition.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.input.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.begin.data, a=-0.8, b=0.8)
 
     @staticmethod
     def bmv_log_product(bm, bv):
@@ -631,9 +633,9 @@ class SNLHMM(nn.Module):
         self.reset_parameter()
 
     def reset_parameter(self):
-        nn.init.uniform_(self.transition.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.input.data, a=-0.5, b=0.5)
-        nn.init.uniform_(self.begin.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.transition.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.input.data, a=-0.8, b=0.8)
+        nn.init.uniform_(self.begin.data, a=-0.8, b=0.8)
 
     @staticmethod
     def bmv_log_product(bm, bv):
